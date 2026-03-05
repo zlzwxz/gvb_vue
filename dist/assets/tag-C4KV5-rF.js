@@ -1,0 +1,1 @@
+import{cu as t}from"./index-CxcepQxD.js";const g=a=>t.get("/tags",{params:a}),p=a=>t.post("/tags",a),o=(a,s)=>t.put(`/tags/${a}`,s),c=a=>t.delete("/tags",{data:a});export{g as a,c as b,o as c,p as d};

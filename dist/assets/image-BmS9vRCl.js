@@ -1,0 +1,1 @@
+import{cu as e}from"./index-CxcepQxD.js";const s=a=>e.post("/images",a,{headers:{"Content-Type":"multipart/form-data"}}),m=a=>e.get("/images",{params:a}),p=a=>e.put("/images",a),i=a=>e.delete("/images",{data:a});export{m as a,s as b,i as c,p as d};

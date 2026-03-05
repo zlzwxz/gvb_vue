@@ -22,7 +22,7 @@
       <el-table-column prop="name" label="名称" />
       <el-table-column label="预览" width="120">
         <template #default="{ row }">
-          <el-image :src="$resolveImg(row.path)" style="width:80px;height:80px;" fit="cover" />
+          <el-image :src="$resolveImg(row.path)" style="width:80px;height:80px;" fit="scale-down" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180">

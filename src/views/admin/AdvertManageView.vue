@@ -13,7 +13,7 @@
       <el-table-column prop="title" label="标题" />
       <el-table-column label="封面" width="120">
         <template #default="{ row }">
-          <el-image :src="$resolveImg(row.images)" style="width:80px;height:50px;" fit="cover" />
+          <el-image :src="$resolveImg(row.images)" style="width:80px;height:50px;" fit="scale-down" />
         </template>
       </el-table-column>
       <el-table-column prop="href" label="链接" />
@@ -52,7 +52,7 @@
               :class="{ 'is-selected': form.images === img.path }"
               @click="form.images = img.path"
             >
-              <el-image :src="$resolveImg(img.path)" fit="cover" style="width:80px;height:80px;" />
+              <el-image :src="$resolveImg(img.path)" fit="scale-down" style="width:80px;height:80px;" />
               <div class="image-picker-name">{{ img.name }}</div>
               <div v-if="form.images === img.path" class="selected-mark">✓</div>
             </div>

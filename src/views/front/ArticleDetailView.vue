@@ -284,7 +284,9 @@ onMounted(() => { loadArticle(); loadComments() })
   height: 40vh; 
   min-height: 300px;
   max-height: 500px;
-  background-size: cover; 
+  background-size: contain; 
+  background-repeat: no-repeat;
+  background-color: #f0f2f5; 
   background-position: center; 
   position: relative; 
   left: 50%;

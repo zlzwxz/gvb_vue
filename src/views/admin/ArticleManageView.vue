@@ -12,7 +12,7 @@
     <div class="article-list">
       <div v-for="item in list" :key="item.id" class="article-item">
         <div class="item-cover" v-if="item.banner_url">
-          <el-image :src="$resolveImg(item.banner_url)" fit="cover" style="width:100%;height:100%;" />
+          <el-image :src="$resolveImg(item.banner_url)" fit="scale-down" style="width:100%;height:100%;" />
         </div>
         <div class="item-cover placeholder" v-else>
           <el-icon :size="30"><Document /></el-icon>

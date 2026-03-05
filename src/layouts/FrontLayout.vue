@@ -17,11 +17,20 @@
         <div class="header-right">
           <el-icon class="search-icon" @click="goTo('Search')"><Search /></el-icon>
           <div class="user-action">
-            <span v-if="!userStore.isLoggedIn" @click="goTo('Login')" class="login-text">登录</span>
-            <span v-else>
-              <span @click="goTo('Profile')" class="login-text">个人中心</span>
-              <span v-if="userStore.isAdmin" @click="goTo('Dashboard')" class="login-text admin-btn" style="margin-left:15px;color:var(--primary-color);">管理后台</span>
-            </span>
+            <template v-if="!userStore.isLoggedIn">
+              <span @click="goTo('Login')" class="login-text">登录</span>
+              <span @click="goTo('Register')" class="login-text" style="margin-left: 12px">注册</span>
+            </template>
+            <template v-else>
+              <div class="logged-in-area">
+                <div class="user-block" @click="goTo('Profile')">
+                  <el-avatar :size="32" :src="$resolveImg(userStore.userInfo?.avatar)" />
+                  <span class="nick-name">{{ userStore.userInfo?.nick_name || userStore.userInfo?.user_name || '我的' }}</span>
+                </div>
+                <span class="nav-btn admin-btn" @click="goToAdmin">后台管理</span>
+                <span class="nav-btn logout-btn" @click="handleLogout">注销</span>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -40,9 +49,10 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { Search } from '@element-plus/icons-vue'
+import { Search, ArrowDown } from '@element-plus/icons-vue'
 import { apiGetMenuList } from '@/api/menu'
 import { apiGetSettings } from '@/api/system'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -77,6 +87,28 @@ function goToMenu(path) {
   } else {
     router.push(path)
   }
+}
+
+function handleUserCommand(command) {
+  if (command === 'logout') {
+    userStore.logout()
+    ElMessage.success('已退出登录')
+    router.push('/')
+  } else if (command === 'admin') {
+    router.push('/admin')
+  } else if (command === 'profile') {
+    router.push('/profile')
+  }
+}
+
+function handleLogout() {
+  userStore.logout()
+  ElMessage.success('已退出登录')
+  router.push('/')
+}
+
+function goToAdmin() {
+  router.push('/admin')
 }
 
 onMounted(() => {
@@ -165,6 +197,41 @@ onMounted(() => {
   font-size: 14px;
   color: var(--text-secondary);
   cursor: pointer;
+  transition: color 0.3s;
+}
+.login-text:hover {
+  color: var(--primary-color);
+}
+.logged-in-area {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+.user-block {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.user-block .nick-name {
+  font-size: 14px;
+  color: var(--text-primary);
+}
+.nav-btn {
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.admin-btn {
+  color: var(--primary-color);
+  font-weight: 600;
+}
+.logout-btn {
+  color: #f56c6c;
+}
+.nav-btn:hover {
+  opacity: 0.8;
+  text-decoration: underline;
 }
 
 .main-content {

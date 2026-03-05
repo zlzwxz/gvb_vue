@@ -53,7 +53,7 @@
               :class="{ 'is-selected': selectedImageIds.includes(img.id) }"
               @click="toggleImage(img.id)"
             >
-              <el-image :src="$resolveImg(img.path)" fit="cover" style="width:60px;height:60px;" />
+              <el-image :src="$resolveImg(img.path)" fit="scale-down" style="width:60px;height:60px;" />
               <div v-if="selectedImageIds.includes(img.id)" class="selected-mark">✓</div>
             </div>
           </div>

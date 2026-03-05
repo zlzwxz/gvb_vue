@@ -1,0 +1,1 @@
+import{cu as e}from"./index-CxcepQxD.js";const r=t=>e.get("/adverts",{params:t}),d=t=>e.post("/adverts",t),p=(t,a)=>e.put(`/adverts/${t}`,a),o=t=>e.delete("/adverts",{data:t});export{r as a,o as b,p as c,d};

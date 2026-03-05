@@ -13,24 +13,27 @@
         :collapse="isCollapse"
         class="admin-menu"
       >
+        <!-- 写作者常用菜单 -->
         <el-menu-item index="/admin/dashboard"><el-icon><DataLine /></el-icon><template #title>仪表盘</template></el-menu-item>
-        <el-menu-item index="/admin/articles"><el-icon><Document /></el-icon><template #title>我的文章</template></el-menu-item>
-        <el-menu-item index="/admin/images"><el-icon><Picture /></el-icon><template #title>图片库</template></el-menu-item>
-        <el-menu-item index="/admin/messages"><el-icon><Message /></el-icon><template #title>消息中心</template></el-menu-item>
+        <el-menu-item index="/admin/articles"><el-icon><Document /></el-icon><template #title>文章管理</template></el-menu-item>
+        <el-menu-item index="/admin/images"><el-icon><Picture /></el-icon><template #title>图片素材</template></el-menu-item>
+        <el-menu-item index="/admin/messages"><el-icon><Message /></el-icon><template #title>我的消息</template></el-menu-item>
         
-        <!-- 管理员专享菜单 -->
-        <template v-if="userStore.isAdmin">
-          <el-menu-item-group title="超级管理员权限">
-            <el-menu-item index="/admin/users"><el-icon><User /></el-icon>用户管理</el-menu-item>
-            <el-menu-item index="/admin/tags"><el-icon><PriceTag /></el-icon>标签管理</el-menu-item>
-            <el-menu-item index="/admin/adverts"><el-icon><Promotion /></el-icon>广告管理</el-menu-item>
-            <el-menu-item index="/admin/menus"><el-icon><Menu /></el-icon>菜单管理</el-menu-item>
-            <el-menu-item index="/admin/comments"><el-icon><ChatDotRound /></el-icon>评论管理</el-menu-item>
-            <el-menu-item index="/admin/chats"><el-icon><ChatLineSquare /></el-icon>聊天管理</el-menu-item>
-            <el-menu-item index="/admin/logs"><el-icon><Tickets /></el-icon>安全日志</el-menu-item>
-            <el-menu-item index="/admin/settings"><el-icon><Setting /></el-icon>系统设置</el-menu-item>
-          </el-menu-item-group>
-        </template>
+        <!-- 管理员专享功能 -->
+        <el-sub-menu index="admin-system" v-if="userStore.isAdmin">
+          <template #title>
+            <el-icon><Tools /></el-icon>
+            <span>系统管理</span>
+          </template>
+          <el-menu-item index="/admin/users"><el-icon><User /></el-icon>用户管理</el-menu-item>
+          <el-menu-item index="/admin/tags"><el-icon><PriceTag /></el-icon>标签管理</el-menu-item>
+          <el-menu-item index="/admin/adverts"><el-icon><Promotion /></el-icon>广告管理</el-menu-item>
+          <el-menu-item index="/admin/menus"><el-icon><Menu /></el-icon>导航管理</el-menu-item>
+          <el-menu-item index="/admin/comments"><el-icon><ChatDotRound /></el-icon>评论管理</el-menu-item>
+          <el-menu-item index="/admin/chats"><el-icon><ChatLineSquare /></el-icon>聊天管理</el-menu-item>
+          <el-menu-item index="/admin/logs"><el-icon><Tickets /></el-icon>安全审计</el-menu-item>
+          <el-menu-item index="/admin/settings"><el-icon><Setting /></el-icon>系统配置</el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
     <el-container>
@@ -45,15 +48,15 @@
         <div class="header-right">
           <el-dropdown @command="handleCommand">
             <span class="el-dropdown-link" style="cursor:pointer;display:flex;align-items:center;">
-              <el-avatar :size="32" :src="userStore.userInfo?.avatar || 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'" style="margin-right:10px" />
-              {{ userStore.userInfo?.nick_name || '普通用户' }}
+              <el-avatar :size="32" :src="$resolveImg(userStore.userInfo?.avatar) || 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'" style="margin-right:10px" />
+              {{ userStore.userInfo?.nick_name || userStore.userInfo?.user_name || '普通用户' }}
               <el-icon class="el-icon--right"><arrow-down /></el-icon>
             </span>
             <template #dropdown>
               <el-dropdown-menu>
                 <el-dropdown-item command="home">返回前台</el-dropdown-item>
-                <el-dropdown-item command="profile">修改资料</el-dropdown-item>
-                <el-dropdown-item divided command="logout">退出登录</el-dropdown-item>
+                <el-dropdown-item command="profile">个人资料</el-dropdown-item>
+                <el-dropdown-item divided command="logout">退出后台</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>
@@ -71,7 +74,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
-import { Fold, Expand, ArrowDown, DataLine, Document, Picture, Message, User, PriceTag, Promotion, Menu, ChatDotRound, ChatLineSquare, Tickets, Setting } from '@element-plus/icons-vue'
+import { Fold, Expand, ArrowDown, DataLine, Document, Picture, Message, User, PriceTag, Promotion, Menu, ChatDotRound, ChatLineSquare, Tickets, Setting, Tools } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()

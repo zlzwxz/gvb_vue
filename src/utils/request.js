@@ -3,7 +3,8 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import router from '@/router'
 
-const TOKEN_EXPIRED_CODES = [401, 7]
+// 后端 res.Error = 7 为通用错误，401 通常为未授权
+const TOKEN_EXPIRED_CODES = [401]
 
 const showError = (message) => {
     ElMessage.error(message || '请求失败')
@@ -32,19 +33,24 @@ const request = axios.create({
 request.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token')
+        console.log(`[Request] ${config.method.toUpperCase()} ${config.url}`, token ? '(Has Token)' : '(No Token)')
         if (token) {
             config.headers.Authorization = `Bearer ${token}`
             config.headers.token = token
         }
         return config
     },
-    (error) => Promise.reject(error)
+    (error) => {
+        console.error('[Request Error]', error)
+        return Promise.reject(error)
+    }
 )
 
 request.interceptors.response.use(
     (response) => {
         const payload = response.data || {}
         const { code, msg } = payload
+        console.log(`[Response] ${response.config.url} Code: ${code}`)
 
         if (code === 0 || typeof code === 'undefined') {
             return payload

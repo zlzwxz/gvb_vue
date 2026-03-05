@@ -34,7 +34,7 @@
     <div v-else-if="results.length" class="result-grid">
       <div v-for="item in results" :key="item.id" class="result-card" @click="goDetail(item.id)">
         <div class="result-cover">
-          <el-image v-if="item.banner_url" :src="$resolveImg(item.banner_url)" fit="cover" style="width:100%;height:100%;" />
+          <el-image v-if="item.banner_url" :src="$resolveImg(item.banner_url)" fit="scale-down" style="width:100%;height:100%;" />
           <div v-else class="cover-fallback">
             <span>{{ item.title?.charAt(0) || '文' }}</span>
           </div>

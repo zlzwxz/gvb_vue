@@ -91,19 +91,16 @@ const banners = ref([])
 
 async function loadMeta() {
   try {
-    const [catRes, tagRes, bannerRes] = await Promise.all([
-      apiGetArticleCategoryList(),
-      apiGetTagList({ limit: 50 }),
+    const [tagRes, bannerRes] = await Promise.all([
+      apiGetTagList({ limit: 100 }),
       apiGetImageList({ limit: 50 })
     ])
-    // Categories API returns: { data: { list: [ { label: "c++", count: 5 } ] } }
-    // or { data: [ "c++", "go" ] } — handle both
-    const catData = catRes?.data?.list || catRes?.data || []
-    categories.value = catData.map(c => typeof c === 'string' ? c : (c.label || c.name || c.title || c.category || '')).filter(c => c)
-
-    // apiGetTagList returns standard page structure: { data: { list: [ { title: 'tag1' } ] } }
+    // Both Category and Tag now use the Tags API as per user request
     const tagData = tagRes?.data?.list || tagRes?.data || []
-    tagOptions.value = tagData.map(t => typeof t === 'string' ? t : (t.title || t.name || t.tag || '')).filter(t => t)
+    const allTags = tagData.map(t => typeof t === 'string' ? t : (t.title || t.name || t.tag || '')).filter(t => t)
+    
+    tagOptions.value = allTags
+    categories.value = allTags
 
     banners.value = bannerRes?.data?.list || bannerRes?.data || []
   } catch (e) { console.error('加载元数据失败', e) }

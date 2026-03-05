@@ -25,9 +25,13 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 // 注册全局图片路径解析函数
 app.config.globalProperties.$resolveImg = (url) => {
     if (!url) return ''
-    if (url.startsWith('http://') || url.startsWith('https://')) return url
-    // 补全前端代理能够拦截的绝对路径（确保以 / 开头）
-    return url.startsWith('/') ? url : `/${url}`
+    if (url.startsWith('http')) return url
+    // 如果路径以 uploads/ 开头，我们确保它以 / 开头即可
+    // 因为 Gin 的 router.StaticFS("uploads", ...) 会匹配 /uploads 并从 uploads 目录找文件
+    if (url.startsWith('uploads/')) return `/${url}`
+    // 如果不带 uploads/ 且不带 /，则补全 /uploads/
+    if (!url.startsWith('/')) return `/uploads/${url}`
+    return url
 }
 
 // 使用插件

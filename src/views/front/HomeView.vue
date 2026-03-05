@@ -6,7 +6,7 @@
         <!-- 菜单轮播图 (menu banners) -->
         <el-carousel v-if="menuBanners.length" height="200px" :interval="5000" arrow="always" style="border-radius: 8px; overflow: hidden; margin-bottom: 20px;">
           <el-carousel-item v-for="img in menuBanners" :key="img.id">
-            <img :src="$resolveImg(img.path)" style="width: 100%; height: 100%; object-fit: cover;" />
+            <img :src="$resolveImg(img.path)" style="width: 100%; height: 100%; object-fit: scale-down;" />
           </el-carousel-item>
         </el-carousel>
 
@@ -21,7 +21,7 @@
         <div class="article-list">
           <div v-for="item in articles" :key="item.id" class="article-card" @click="goDetail(item.id)">
             <div class="card-cover">
-              <el-image v-if="item.banner_url" :src="$resolveImg(item.banner_url)" fit="cover" style="width:100%;height:100%;" />
+              <el-image v-if="item.banner_url" :src="$resolveImg(item.banner_url)" fit="scale-down" style="width:100%;height:100%;" />
               <div v-else class="cover-placeholder">
                 <span>{{ item.title?.charAt(0) || '文' }}</span>
               </div>
@@ -68,7 +68,7 @@
           <div class="advert-list">
             <a v-for="ad in adverts" :key="ad.id" :href="ad.href" target="_blank" class="advert-item">
               <div class="advert-bg">
-                <img :src="$resolveImg(ad.images)" style="width:100%; height:100%; object-fit:cover; position:absolute; top:0; left:0;" />
+                <img :src="$resolveImg(ad.images)" style="width:100%; height:100%; object-fit:scale-down; position:absolute; top:0; left:0;" />
                 <div class="advert-overlay"></div>
                 <span class="advert-text">{{ ad.title }}</span>
               </div>
