@@ -1,0 +1,1 @@
+import{ct as a}from"./index-BMf_DB3O.js";const g=t=>a.get("/tags",{params:t}),p=t=>a.post("/tags",t),o=(t,s)=>a.put(`/tags/${t}`,s),c=t=>a.delete("/tags",{data:t});export{g as a,c as b,o as c,p as d};

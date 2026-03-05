@@ -1,0 +1,161 @@
+<template>
+  <div class="profile-view">
+    <div class="container">
+      <div class="profile-grid">
+        <!-- 个人信息卡片 -->
+        <div class="profile-card card">
+          <div class="avatar-area">
+            <div class="avatar-circle">
+              {{ (userStore.userInfo?.nick_name || userStore.userInfo?.user_name || 'U')[0].toUpperCase() }}
+            </div>
+            <h2 class="user-name">{{ userStore.userInfo?.nick_name || userStore.userInfo?.user_name }}</h2>
+            <p class="user-bio">{{ userStore.userInfo?.bio || '这个人很懒，什么都没留�? }}</p>
+          </div>
+
+          <!-- 修改昵称表单 -->
+          <el-divider>修改个人信息</el-divider>
+          <el-form :model="profileForm" label-width="80px" class="profile-form">
+            <el-form-item label="昵称">
+              <el-input v-model="profileForm.nick_name" placeholder="请输入昵�? />
+            </el-form-item>
+            <el-form-item label="个人签名">
+              <el-input v-model="profileForm.bio" type="textarea" :rows="3" placeholder="一句话介绍自己" />
+            </el-form-item>
+            <el-form-item label="个人链接">
+              <el-input v-model="profileForm.link" placeholder="https://..." />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" :loading="profileLoading" @click="saveProfile">保存修改</el-button>
+            </el-form-item>
+          </el-form>
+
+          <!-- 绑定邮箱 -->
+          <el-divider>绑定邮箱</el-divider>
+          <el-form label-width="80px">
+            <el-form-item label="邮箱">
+              <el-input v-model="emailForm.email" placeholder="请输入邮箱地址" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" plain :loading="emailLoading" @click="bindEmail">绑定邮箱</el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { reactive, ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/stores/user'
+import { apiUpdateUserNickName, apiBindEmail } from '@/api/user'
+
+const userStore = useUserStore()
+
+// 修改昵称表单
+const profileForm = reactive({
+  nick_name: '',
+  bio: '',
+  link: ''
+})
+
+// 绑定邮箱表单
+const emailForm = reactive({ email: '' })
+
+const profileLoading = ref(false)
+const emailLoading = ref(false)
+
+// 初始化表单内�?
+onMounted(() => {
+  const info = userStore.userInfo
+  if (info) {
+    profileForm.nick_name = info.nick_name || ''
+    profileForm.bio = info.bio || ''
+    profileForm.link = info.link || ''
+  }
+})
+
+/**
+ * 保存个人信息（昵称、签名、链接）
+ */
+const saveProfile = async () => {
+  profileLoading.value = true
+  try {
+    await apiUpdateUserNickName(profileForm)
+    await userStore.fetchUserInfo()
+    ElMessage.success('修改成功�?)
+  } finally {
+    profileLoading.value = false
+  }
+}
+
+/**
+ * 绑定邮箱
+ */
+const bindEmail = async () => {
+  if (!emailForm.email) {
+    ElMessage.warning('请输入邮箱地址')
+    return
+  }
+  emailLoading.value = true
+  try {
+    await apiBindEmail(emailForm)
+    ElMessage.success('邮箱绑定成功�?)
+  } finally {
+    emailLoading.value = false
+  }
+}
+</script>
+
+<style scoped>
+.profile-view {
+  padding: 2rem 0;
+}
+
+.profile-grid {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.profile-card {
+  padding: 2rem;
+}
+
+.avatar-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.avatar-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #a855f7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.user-name {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.user-bio {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.profile-form :deep(.el-input__wrapper) {
+  background: var(--bg-hover);
+}
+</style>
