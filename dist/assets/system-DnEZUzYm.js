@@ -1,0 +1,1 @@
+import{cE as e}from"./index-CXXBiwJt.js";const o=t=>e.get("/logs",{params:t}),i=t=>e.delete("/logs",{data:t}),g=()=>e.get("/data_sum"),n=()=>e.get("/data_login"),c=t=>e.get(`/settings/${t}`),p=(t,s)=>e.put(`/settings/${t}`,s),r=t=>e.get("/news",{params:t}),u=()=>e.get("/news/sources");export{c as a,g as b,u as c,r as d,n as e,o as f,i as g,p as h};

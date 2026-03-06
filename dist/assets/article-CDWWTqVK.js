@@ -1,1 +1,0 @@
-import{cu as e}from"./index-CxcepQxD.js";const c=t=>e.get("/articles",{params:t}),a=t=>e.get(`/articles/${t}`),i=t=>e.post("/articles",t),l=t=>e.put("/articles",t),r=t=>e.delete("/articles",{data:t}),o=t=>e.post("/articles/collects",t),p=t=>e.get("/articles/collects",{params:t}),g=t=>e.post("/article/digg",t);export{c as a,a as b,g as c,o as d,p as e,r as f,l as g,i as h};

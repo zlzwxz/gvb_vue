@@ -1,29 +1,34 @@
 <template>
   <div class="chat-manage">
-    <el-row justify="space-between" style="margin-bottom:20px;">
-      <el-col>
+    <el-card shadow="never">
+      <div class="toolbar">
         <el-button type="primary" @click="showCreate = true">创建群组</el-button>
-      </el-col>
-    </el-row>
-    <el-table :data="list" style="width: 100%" stripe>
-      <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="nick_name" label="昵称" width="150" />
-      <el-table-column prop="avatar" label="头像" width="100">
-        <template #default="{ row }">
-          <el-avatar :src="row.avatar" size="small" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="content" label="内容" />
-      <el-table-column prop="created_at" label="发送时间" width="180" />
-    </el-table>
-    <el-pagination
-      background
-      layout="prev, pager, next"
-      :page-size="pageSize"
-      :total="total"
-      @current-change="fetchList"
-      style="margin-top:20px; text-align:center;"
-    />
+        <el-button @click="fetchList(1)">刷新</el-button>
+      </div>
+
+      <el-table :data="list" stripe>
+        <el-table-column prop="id" label="ID" width="80" />
+        <el-table-column prop="nick_name" label="昵称" width="150" />
+        <el-table-column prop="avatar" label="头像" width="100">
+          <template #default="{ row }">
+            <el-avatar :src="$resolveImg(row.avatar)" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="content" label="内容" show-overflow-tooltip />
+        <el-table-column prop="created_at" label="发送时间" width="180" />
+      </el-table>
+
+      <el-empty v-if="!list.length" description="暂无群聊记录" />
+
+      <el-pagination
+        background
+        layout="total, prev, pager, next"
+        :page-size="pageSize"
+        :total="total"
+        @current-change="fetchList"
+      />
+    </el-card>
+
     <el-dialog title="创建聊天群组" v-model="showCreate">
       <el-form :model="form" ref="chatForm" label-width="80px">
         <el-form-item label="群组名称" prop="name">
@@ -76,13 +81,14 @@ const form = ref({
 })
 
 async function fetchList(page = 1) {
-  const res = await apiGetChatList({ page, size: pageSize })
-  list.value = res.data?.list || res.data || []
-  total.value = res.data?.total || 0
+  const res = await apiGetChatList({ page, size: pageSize, limit: pageSize })
+  const data = res.data || {}
+  list.value = data.list || (Array.isArray(data) ? data : [])
+  total.value = data.total || data.count || 0
 }
 
 function handleUploadSuccess(response) {
-  form.value.avatar = response.data?.url || ''
+  form.value.avatar = response.data?.url || response.data || ''
 }
 
 async function saveChatGroup() {
@@ -106,5 +112,9 @@ onMounted(() => fetchList())
 </script>
 
 <style scoped>
-.chat-manage { padding: 20px; }
+.toolbar {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+}
 </style>

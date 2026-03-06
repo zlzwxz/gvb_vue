@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+﻿import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
@@ -11,34 +11,31 @@ import App from './App.vue'
 import router from './router'
 import './assets/styles/main.css'
 
-// 配置 NProgress 进度条
+// NProgress 只保留顶部细条，不显示默认小转圈。
 NProgress.configure({ showSpinner: false })
 
 const app = createApp(App)
 const pinia = createPinia()
 
-// 注册所有 Element Plus 图标
+// Element Plus 图标是按组件名注册的。
+// 注册完成后，模板里就可以直接写 <User />、<Search /> 这一类图标组件。
 for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-    app.component(key, component)
+  app.component(key, component)
 }
 
-// 注册全局图片路径解析函数
+// 注册一个全局工具函数，把后端返回的相对图片路径转成前端可直接访问的 URL。
 app.config.globalProperties.$resolveImg = (url) => {
-    if (!url) return ''
-    if (url.startsWith('http')) return url
-    // 如果路径以 uploads/ 开头，我们确保它以 / 开头即可
-    // 因为 Gin 的 router.StaticFS("uploads", ...) 会匹配 /uploads 并从 uploads 目录找文件
-    if (url.startsWith('uploads/')) return `/${url}`
-    // 如果不带 uploads/ 且不带 /，则补全 /uploads/
-    if (!url.startsWith('/')) return `/uploads/${url}`
-    return url
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  if (url.startsWith('uploads/')) return `/${url}`
+  if (!url.startsWith('/')) return `/uploads/${url}`
+  return url
 }
 
-// 使用插件
 app.use(pinia)
 app.use(router)
 app.use(ElementPlus, {
-    locale: zhCn // 中文语言包
+  locale: zhCn
 })
 
 app.mount('#app')

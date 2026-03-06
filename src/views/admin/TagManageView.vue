@@ -1,31 +1,33 @@
 <template>
   <div class="tag-manage">
-    <el-row justify="space-between" style="margin-bottom:20px;">
-      <el-col>
+    <el-card shadow="never">
+      <div class="toolbar">
         <el-button type="primary" @click="showCreate = true">新建标签</el-button>
-      </el-col>
-      <el-col>
-        <el-input placeholder="搜索标签" v-model="search" clearable @clear="fetchList" @keyup.enter="fetchList" style="width:200px;" />
-      </el-col>
-    </el-row>
-    <el-table :data="list" style="width: 100%" stripe>
-      <el-table-column prop="id" label="ID" width="60" />
-      <el-table-column prop="title" label="标签名" />
-      <el-table-column label="操作" width="180">
-        <template #default="{ row }">
-          <el-button type="text" @click="editTag(row)">编辑</el-button>
-          <el-button type="text" @click="deleteTag(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-pagination
-      background
-      layout="prev, pager, next"
-      :page-size="pageSize"
-      :total="total"
-      @current-change="fetchList"
-      style="margin-top:20px; text-align:center;"
-    />
+        <el-input placeholder="搜索标签" v-model="search" clearable @clear="fetchList" @keyup.enter="fetchList" style="width:220px;" />
+      </div>
+
+      <el-table :data="list" stripe>
+        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="title" label="标签名" />
+        <el-table-column label="操作" width="180">
+          <template #default="{ row }">
+            <el-button type="primary" link @click="editTag(row)">编辑</el-button>
+            <el-button type="danger" link @click="deleteTag(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-empty v-if="!list.length" description="暂无标签" />
+
+      <el-pagination
+        background
+        layout="total, prev, pager, next"
+        :page-size="pageSize"
+        :total="total"
+        @current-change="fetchList"
+      />
+    </el-card>
+
     <el-dialog :title="isEdit ? '编辑标签' : '新建标签'" v-model="showCreate">
       <el-form :model="form" :rules="rules" ref="tagForm">
         <el-form-item label="标签名" prop="title">
@@ -55,11 +57,12 @@ const form = ref({ id: null, title: '' })
 const rules = { title: [{ required: true, message: '标签名不能为空', trigger: 'blur' }] }
 
 async function fetchList(page = 1) {
-  const params = { page, size: pageSize }
+  const params = { page, size: pageSize, limit: pageSize }
   if (search.value) params.title = search.value
   const res = await apiGetTagList(params)
-  list.value = res.data.list || []
-  total.value = res.data.total || 0
+  const data = res.data || {}
+  list.value = data.list || []
+  total.value = data.total || data.count || 0
 }
 
 function editTag(row) {
@@ -93,5 +96,11 @@ onMounted(() => fetchList())
 </script>
 
 <style scoped>
-.tag-manage { padding: 20px; }
+.toolbar {
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 </style>

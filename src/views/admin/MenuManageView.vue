@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="menu-manage">
     <el-row justify="space-between" style="margin-bottom:20px;">
       <el-col>
@@ -77,6 +77,7 @@ const list = ref([])
 const showCreate = ref(false)
 const isEdit = ref(false)
 const imageList = ref([])
+// 这里只保存选中的图片 ID 顺序，真正提交时再转换成后端需要的 image_sort_list。
 const selectedImageIds = ref([])
 
 const form = ref({
@@ -125,6 +126,7 @@ function openCreate() {
 }
 
 function editMenu(row) {
+  // 编辑时一定要把菜单 id 带回表单，后端才能精确更新当前菜单，而不是误改其它菜单。
   isEdit.value = true
   form.value = {
     id: row.id,
@@ -150,6 +152,7 @@ function deleteMenu(id) {
 }
 
 async function saveMenu() {
+  // 前端显式把排序号传给后端，这样每个菜单都能保存自己的轮播顺序。
   const imageSortList = selectedImageIds.value.map((imgId, idx) => ({
     image_id: imgId,
     sort: idx + 1
@@ -216,3 +219,4 @@ onMounted(() => fetchList())
   text-align: center;
 }
 </style>
+

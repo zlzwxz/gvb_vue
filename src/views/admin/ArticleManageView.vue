@@ -1,180 +1,261 @@
 <template>
-  <div class="article-manage">
-    <div class="manage-header">
-      <el-button type="primary" @click="goCreate" icon="Plus">新建文章</el-button>
-      <el-input placeholder="搜索文章标题..." v-model="search" clearable @clear="fetchList" @keyup.enter="fetchList" class="search-input">
-        <template #append>
-          <el-button @click="fetchList" icon="Search" />
-        </template>
-      </el-input>
-    </div>
-
-    <div class="article-list">
-      <div v-for="item in list" :key="item.id" class="article-item">
-        <div class="item-cover" v-if="item.banner_url">
-          <el-image :src="$resolveImg(item.banner_url)" fit="scale-down" style="width:100%;height:100%;" />
+  <div class="article-manage-page">
+    <el-card shadow="never">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <el-button type="primary" @click="goCreate">
+            <el-icon><Plus /></el-icon>
+            新建文章
+          </el-button>
+          <el-button @click="fetchList(currentPage)" :loading="loading">刷新</el-button>
         </div>
-        <div class="item-cover placeholder" v-else>
-          <el-icon :size="30"><Document /></el-icon>
-        </div>
-        <div class="item-body">
-          <div class="item-title" @click="goEdit(item.id)">{{ item.title }}</div>
-          <div class="item-abstract">{{ item.abstract || '暂无摘要' }}</div>
-          <div class="item-meta">
-            <span class="meta-author"><el-icon><User /></el-icon> {{ item.user_name || item.author || '未知' }}</span>
-            <span class="meta-date"><el-icon><Clock /></el-icon> {{ formatDate(item.created_at) }}</span>
-            <span class="meta-stat"><el-icon><View /></el-icon> {{ item.look_count || 0 }}</span>
-            <span class="meta-stat"><el-icon><Star /></el-icon> {{ item.digg_count || 0 }}</span>
-            <span class="meta-stat"><el-icon><ChatDotRound /></el-icon> {{ item.comment_count || 0 }}</span>
-            <el-tag v-for="tag in (item.tags || [])" :key="tag" size="small" type="info" effect="plain" round style="margin-left:4px;">{{ tag }}</el-tag>
-          </div>
-        </div>
-        <div class="item-actions">
-          <el-button type="primary" text @click="goEdit(item.id)">编辑</el-button>
-          <el-button type="danger" text @click="handleDelete(item.id)">删除</el-button>
+        <div class="toolbar-right">
+          <el-input
+            v-model="search"
+            placeholder="搜索文章标题"
+            clearable
+            style="width: 240px"
+            @clear="fetchList(1)"
+            @keyup.enter="fetchList(1)"
+          >
+            <template #prefix><el-icon><Search /></el-icon></template>
+          </el-input>
+          <el-select v-model="sort" style="width: 160px" @change="fetchList(1)">
+            <el-option label="最新发布" value="created_at desc" />
+            <el-option label="最多浏览" value="look_count desc" />
+            <el-option label="最多点赞" value="digg_count desc" />
+            <el-option label="最多评论" value="comment_count desc" />
+          </el-select>
+          <el-select v-model="reviewStatus" style="width: 140px" @change="fetchList(1)">
+            <el-option label="全部状态" :value="0" />
+            <el-option label="待审核" :value="1" />
+            <el-option label="已通过" :value="2" />
+            <el-option label="已驳回" :value="3" />
+          </el-select>
         </div>
       </div>
 
-      <el-empty v-if="!list.length" description="暂无文章" />
-    </div>
+      <el-table :data="list" stripe v-loading="loading">
+        <el-table-column label="作者" width="220">
+          <template #default="{ row }">
+            <div class="author-cell">
+              <el-avatar :size="28" :src="$resolveImg(row.user_avatar)" />
+              <div class="author-name-wrap">
+                <div class="author-name">{{ row.user_nick_name || `用户${row.user_id || ''}` }}</div>
+                <div class="author-id">UID: {{ row.user_id || '-' }}</div>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="title" label="标题" min-width="280" show-overflow-tooltip>
+          <template #default="{ row }">
+            <el-button type="primary" link @click="goEdit(row.id)">{{ row.title }}</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column prop="category" label="分类" width="140">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain">{{ row.category || '未分类' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="look_count" label="浏览" width="90" />
+        <el-table-column prop="digg_count" label="点赞" width="90" />
+        <el-table-column prop="comment_count" label="评论" width="90" />
+        <el-table-column prop="collects_count" label="收藏" width="90" />
+        <el-table-column prop="review_status" label="审核状态" width="130">
+          <template #default="{ row }">
+            <el-tag :type="statusTagType(row.review_status)" effect="plain" size="small">
+              {{ statusText(row.review_status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="发布时间" width="180">
+          <template #default="{ row }">{{ formatDate(row.created_at) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="220" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link @click="goEdit(row.id)">编辑</el-button>
+            <el-button
+              v-if="userStore.isAdmin && Number(row.review_status) === 1"
+              type="warning"
+              link
+              @click="goReview"
+            >
+              审核
+            </el-button>
+            <el-button type="danger" link @click="handleDelete(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
 
-    <el-pagination
-      v-if="total > 0"
-      background
-      layout="prev, pager, next"
-      :page-size="pageSize"
-      :total="total"
-      @current-change="fetchList"
-      style="margin-top:20px; display:flex; justify-content:center;"
-    />
+      <el-empty v-if="!loading && list.length === 0" description="暂无文章数据" />
+
+      <el-pagination
+        v-if="total > 0"
+        background
+        layout="total, prev, pager, next"
+        :page-size="pageSize"
+        :current-page="currentPage"
+        :total="total"
+        @current-change="fetchList"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { apiGetArticleList, apiDeleteArticle } from '@/api/article'
+import { apiDeleteArticle, apiGetArticleList } from '@/api/article'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User, Clock, View, Star, ChatDotRound, Document, Plus, Search } from '@element-plus/icons-vue'
+import { Plus, Search } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const list = ref([])
 const total = ref(0)
-const pageSize = 10
+const currentPage = ref(1)
+const pageSize = 12
+const loading = ref(false)
 const search = ref('')
+const sort = ref('created_at desc')
+const reviewStatus = ref(0)
 
-function goCreate() { router.push({ name: 'ArticleEdit' }) }
-function goEdit(id) { router.push({ name: 'ArticleEdit', query: { id } }) }
+function goCreate() {
+  router.push({ name: 'ArticleEdit' })
+}
+
+function goEdit(id) {
+  router.push({ name: 'ArticleEdit', query: { id } })
+}
+
+function goReview() {
+  router.push({ name: 'ArticleReview' })
+}
+
+function statusText(status) {
+  const value = Number(status)
+  if (value === 1) return '待审核'
+  if (value === 2 || value === 0) return '已通过'
+  if (value === 3) return '已驳回'
+  return '未知'
+}
+
+function statusTagType(status) {
+  const value = Number(status)
+  if (value === 1) return 'warning'
+  if (value === 3) return 'danger'
+  return 'success'
+}
 
 function formatDate(dateStr) {
-  if (!dateStr) return '未知'
+  if (!dateStr) return '-'
   const d = new Date(dateStr)
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  if (Number.isNaN(d.getTime())) return dateStr
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 async function fetchList(page = 1) {
-  const params = { page, size: pageSize }
-  if (search.value) params.title = search.value
-  const res = await apiGetArticleList(params)
-  list.value = res.data?.list || res.data || []
-  total.value = res.data?.total || 0
+  currentPage.value = page
+  loading.value = true
+  try {
+    const params = {
+      page,
+      size: pageSize,
+      limit: pageSize,
+      sort: sort.value,
+      review_status: reviewStatus.value
+    }
+    if (search.value.trim()) {
+      params.key = search.value.trim()
+      params.title = search.value.trim()
+    }
+    if (!userStore.isAdmin) {
+      params.is_user = true
+    } else {
+      params.review_scope = 'all'
+    }
+
+    const res = await apiGetArticleList(params)
+    const data = res.data || {}
+    const rawList = data.list || (Array.isArray(data) ? data : [])
+    if (userStore.isAdmin) {
+      list.value = rawList
+      total.value = Number(data.total || data.count || list.value.length)
+      return
+    }
+
+    const selfId = Number(userStore.currentUserId)
+    list.value = rawList.filter((item) => Number(item.user_id) === selfId)
+    const allOwned = rawList.every((item) => Number(item.user_id) === selfId)
+    total.value = allOwned
+      ? Number(data.total || data.count || list.value.length)
+      : Number(list.value.length)
+  } catch (e) {
+    ElMessage.error('获取文章列表失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 async function handleDelete(id) {
   try {
-    await ElMessageBox.confirm('确定删除该文章吗？', '警告', { type: 'warning' })
+    await ElMessageBox.confirm('确定删除这篇文章吗？此操作不可恢复。', '删除确认', { type: 'warning' })
     await apiDeleteArticle({ id_list: [String(id)] })
     ElMessage.success('删除成功')
-    fetchList()
-  } catch (e) { /* cancelled */ }
+    await fetchList(currentPage.value)
+  } catch {
+    // 用户取消或删除失败时无需额外处理
+  }
 }
 
-onMounted(() => fetchList())
+onMounted(() => {
+  fetchList(1)
+})
 </script>
 
 <style scoped>
-.article-manage { padding: 20px; }
-.manage-header {
+.toolbar {
+  margin-bottom: 14px;
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  gap: 10px;
+  flex-wrap: wrap;
 }
-.search-input { width: 280px; }
 
-.article-list { display: flex; flex-direction: column; gap: 16px; }
-.article-item {
-  display: flex;
-  align-items: stretch;
-  background: var(--bg-card, #fff);
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  transition: box-shadow 0.3s, transform 0.2s;
-}
-.article-item:hover { box-shadow: 0 6px 20px rgba(0,0,0,0.1); transform: translateY(-2px); }
-
-.item-cover {
-  width: 200px;
-  min-height: 140px;
-  flex-shrink: 0;
-  overflow: hidden;
-  background: #f5f5f5;
-}
-.item-cover.placeholder {
+.toolbar-left,
+.toolbar-right {
   display: flex;
   align-items: center;
-  justify-content: center;
-  color: #ddd;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: rgba(255,255,255,0.5);
+  gap: 8px;
 }
 
-.item-body {
-  flex: 1;
-  padding: 18px 20px;
+.author-cell {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.author-name-wrap {
   min-width: 0;
 }
-.item-title {
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: color 0.2s;
+
+.author-name {
+  font-size: 13px;
+  color: #303133;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.item-title:hover { color: var(--primary-color); }
-.item-abstract {
-  font-size: 13px;
-  color: var(--text-secondary, #999);
-  margin-bottom: 10px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.item-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  font-size: 12px;
-  color: var(--text-muted, #bbb);
-}
-.item-meta span { display: flex; align-items: center; gap: 3px; }
 
-.item-actions {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
-  padding: 10px 16px;
-  border-left: 1px solid #f0f0f0;
+.author-id {
+  font-size: 12px;
+  color: #909399;
+}
+
+@media (max-width: 768px) {
+  .toolbar-right {
+    width: 100%;
+  }
 }
 </style>

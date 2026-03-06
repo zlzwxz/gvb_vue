@@ -43,6 +43,28 @@
             @imgAdd="handleEditorImgAdd"
           />
         </el-form-item>
+        <el-form-item label="附件">
+          <div class="attachment-box">
+            <el-upload
+              :show-file-list="false"
+              :http-request="handleAttachmentUpload"
+              :disabled="loading"
+            >
+              <el-button type="primary" plain>上传附件</el-button>
+            </el-upload>
+            <el-text type="info" size="small">支持 pdf/doc/docx/xls/xlsx/ppt/pptx/txt/zip/rar/7z/csv/md</el-text>
+            <div class="attachment-list" v-if="form.attachments.length">
+              <div v-for="(item, idx) in form.attachments" :key="`${item.url}-${idx}`" class="attachment-item">
+                <span class="attachment-name">{{ item.name }}</span>
+                <span class="attachment-size">{{ formatFileSize(item.size) }}</span>
+                <div class="attachment-actions">
+                  <el-button type="primary" link @click="insertAttachmentLink(item)">插入到正文</el-button>
+                  <el-button type="danger" link @click="removeAttachment(idx)">移除</el-button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSubmit" :loading="loading">{{ isEdit ? '更新' : '创建' }}</el-button>
           <el-button @click="goBack">返回</el-button>
@@ -55,8 +77,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-import { apiCreateArticle, apiUpdateArticle, apiGetArticleDetail, apiGetArticleCategoryList } from '@/api/article'
+import { apiCreateArticle, apiUpdateArticle, apiGetArticleDetail, apiUploadArticleFile } from '@/api/article'
 import { apiGetTagList } from '@/api/tag'
 import { apiUploadImage, apiGetImageList } from '@/api/image'
 import { ElMessage } from 'element-plus'
@@ -65,7 +86,6 @@ import 'mavon-editor/dist/css/index.css'
 
 const router = useRouter()
 const route = useRoute()
-const userStore = useUserStore()
 
 const mdRef = ref(null)
 const isEdit = computed(() => !!route.query.id)
@@ -77,7 +97,8 @@ const form = ref({
   tags: [],
   banner_id: null,
   abstract: '',
-  content: ''
+  content: '',
+  attachments: []
 })
 
 const rules = {
@@ -115,6 +136,7 @@ async function loadArticle(id) {
   form.value.banner_id = data.banner_id || null
   form.value.abstract = data.abstract || ''
   form.value.content = data.content || ''
+  form.value.attachments = Array.isArray(data.attachments) ? data.attachments : []
 }
 
 onMounted(async () => {
@@ -138,16 +160,54 @@ async function handleSubmit() {
   loading.value = true
   try {
     if (isEdit.value) {
-      await apiUpdateArticle({ ...form.value, id: String(route.query.id) })
-      ElMessage.success('文章更新成功')
+      const res = await apiUpdateArticle({ ...form.value, id: String(route.query.id) })
+      ElMessage.success(res.msg || '文章更新成功')
     } else {
-      await apiCreateArticle(form.value)
-      ElMessage.success('文章创建成功')
+      const res = await apiCreateArticle(form.value)
+      ElMessage.success(res.msg || '文章创建成功')
     }
     router.push({ name: 'ArticleManage' })
   } catch (e) {
     ElMessage.error(e.response?.data?.msg || '操作失败')
   } finally { loading.value = false }
+}
+
+async function handleAttachmentUpload(option) {
+  try {
+    const fd = new FormData()
+    fd.append('file', option.file)
+    const res = await apiUploadArticleFile(fd)
+    const item = res.data || {}
+    if (!item.url) {
+      throw new Error('上传失败')
+    }
+    form.value.attachments.push({
+      file_id: Number(item.id || 0),
+      name: item.name || option.file.name,
+      url: item.url,
+      size: Number(item.size || option.file.size || 0)
+    })
+    ElMessage.success('附件上传成功')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.msg || '附件上传失败')
+  }
+}
+
+function removeAttachment(index) {
+  form.value.attachments.splice(index, 1)
+}
+
+function insertAttachmentLink(item) {
+  const text = `\n[附件下载：${item.name}](${item.url})\n`
+  form.value.content = `${form.value.content || ''}${text}`
+  ElMessage.success('已插入下载链接到正文')
+}
+
+function formatFileSize(size) {
+  const num = Number(size || 0)
+  if (num < 1024) return `${num}B`
+  if (num < 1024 * 1024) return `${(num / 1024).toFixed(1)}KB`
+  return `${(num / 1024 / 1024).toFixed(1)}MB`
 }
 
 function goBack() { router.back() }
@@ -171,5 +231,43 @@ function goBack() { router.back() }
 .selected-mark {
   position: absolute; top: 2px; right: 2px; background: #67c23a; color: #fff;
   width: 20px; height: 20px; border-radius: 50%; font-size: 12px; line-height: 20px; text-align: center;
+}
+
+.attachment-box {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+}
+
+.attachment-list {
+  display: grid;
+  gap: 6px;
+}
+
+.attachment-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachment-size {
+  color: #909399;
+  font-size: 12px;
+}
+
+.attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 </style>

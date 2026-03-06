@@ -1,44 +1,46 @@
 <template>
   <div class="advert-manage">
-    <el-row justify="space-between" style="margin-bottom:20px;">
-      <el-col>
+    <el-card shadow="never">
+      <div class="toolbar">
         <el-button type="primary" @click="openCreate">新建广告</el-button>
-      </el-col>
-      <el-col>
-        <el-input placeholder="搜索标题" v-model="search" clearable @clear="fetchList" @keyup.enter="fetchList" style="width:200px;" />
-      </el-col>
-    </el-row>
-    <el-table :data="list" style="width: 100%" stripe>
-      <el-table-column prop="id" label="ID" width="60" />
-      <el-table-column prop="title" label="标题" />
-      <el-table-column label="封面" width="120">
-        <template #default="{ row }">
-          <el-image :src="$resolveImg(row.images)" style="width:80px;height:50px;" fit="scale-down" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="href" label="链接" />
-      <el-table-column prop="sort" label="排序" width="80" />
-      <el-table-column prop="is_show" label="显示" width="80">
-        <template #default="{ row }">
-          <el-tag type="success" v-if="row.is_show">是</el-tag>
-          <el-tag type="info" v-else>否</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="180">
-        <template #default="{ row }">
-          <el-button type="text" @click="editAdvert(row)">编辑</el-button>
-          <el-button type="text" @click="deleteAdvert(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-pagination
-      background
-      layout="prev, pager, next"
-      :page-size="pageSize"
-      :total="total"
-      @current-change="fetchList"
-      style="margin-top:20px; text-align:center;"
-    />
+        <el-input placeholder="搜索标题" v-model="search" clearable @clear="fetchList" @keyup.enter="fetchList" style="width:220px;" />
+      </div>
+
+      <el-table :data="list" stripe v-loading="loading">
+        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="title" label="标题" />
+        <el-table-column label="封面" width="120">
+          <template #default="{ row }">
+            <el-image :src="$resolveImg(row.images)" style="width:80px;height:50px;" fit="scale-down" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="href" label="链接" show-overflow-tooltip />
+        <el-table-column prop="sort" label="排序" width="80" />
+        <el-table-column prop="is_show" label="显示" width="80">
+          <template #default="{ row }">
+            <el-tag type="success" v-if="row.is_show">是</el-tag>
+            <el-tag type="info" v-else>否</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180">
+          <template #default="{ row }">
+            <el-button type="primary" link @click="editAdvert(row)">编辑</el-button>
+            <el-button type="danger" link @click="deleteAdvert(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-empty v-if="!loading && !list.length" description="暂无广告数据" />
+
+      <el-pagination
+        background
+        layout="total, prev, pager, next"
+        :page-size="pageSize"
+        :total="total"
+        @current-change="fetchList"
+      />
+    </el-card>
+
     <el-dialog :title="isEdit ? '编辑广告' : '新建广告'" v-model="showCreate" width="700px">
       <el-form :model="form" :rules="rules" ref="advertForm">
         <el-form-item label="标题" prop="title"><el-input v-model="form.title" /></el-form-item>
@@ -83,6 +85,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 const list = ref([])
 const total = ref(0)
 const pageSize = 10
+const loading = ref(false)
 const search = ref('')
 const showCreate = ref(false)
 const isEdit = ref(false)
@@ -95,11 +98,17 @@ const rules = {
 }
 
 async function fetchList(page = 1) {
-  const params = { page, size: pageSize }
-  if (search.value) params.title = search.value
-  const res = await apiGetAdvertList(params)
-  list.value = res.data.list || []
-  total.value = res.data.total || 0
+  loading.value = true
+  try {
+    const params = { page, size: pageSize, limit: pageSize }
+    if (search.value) params.title = search.value
+    const res = await apiGetAdvertList(params)
+    const data = res.data || {}
+    list.value = data.list || []
+    total.value = data.total || data.count || 0
+  } finally {
+    loading.value = false
+  }
 }
 
 async function loadImages() {
@@ -159,7 +168,13 @@ onMounted(() => fetchList())
 </script>
 
 <style scoped>
-.advert-manage { padding: 20px; }
+.toolbar {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 .image-picker {
   display: flex;
   flex-wrap: wrap;

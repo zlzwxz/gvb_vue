@@ -1,4 +1,4 @@
-import request from '@/utils/request'
+﻿import request from '@/utils/request'
 
 // ==================== 12. 日志管理接口 ====================
 export const apiGetLogList = (params) => request.get('/logs', { params })
@@ -14,3 +14,5 @@ export const apiUpdateSetting = (name, data) => request.put(`/settings/${name}`,
 
 // ==================== 15. 新闻管理接口 ====================
 export const apiGetNewsList = (params) => request.get('/news', { params })
+export const apiGetNewsSourceList = () => request.get('/news/sources')
+

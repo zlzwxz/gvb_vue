@@ -1,0 +1,1 @@
+import{cE as e}from"./index-CXXBiwJt.js";const s=a=>e.post("/images",a,{headers:{"Content-Type":"multipart/form-data"}}),m=a=>e.get("/images",{params:a}),p=a=>e.put("/images",a),i=a=>e.delete("/images",{data:a});export{s as a,m as b,i as c,p as d};

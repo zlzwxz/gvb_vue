@@ -75,7 +75,7 @@
           <template #default="{ row }">
             <div style="display:flex; align-items:center; gap:8px;">
               <el-avatar :size="30" :src="row.user?.avatar ? $resolveImg(row.user.avatar) : defaultAvatar" />
-              <span>{{ row.user?.nick_name || row.user?.user_name || '匿名' }}</span>
+              <span>{{ getCommentDisplayName(row) }}</span>
             </div>
           </template>
         </el-table-column>
@@ -124,17 +124,27 @@ function formatDate(dateStr) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
+function getCommentDisplayName(comment) {
+  const nickName = String(comment?.user?.nick_name || comment?.user_nick_name || '').trim()
+  if (nickName) return nickName
+
+  const userName = String(comment?.user?.user_name || comment?.user_name || '').trim()
+  if (userName) return userName
+
+  return comment?.user_id ? `用户${comment.user_id}` : '匿名'
+}
+
 // --- 文章管理逻辑 ---
 async function fetchArticles(page = 1) {
   currentPage.value = page
   loading.value = true
   try {
-    const params = { page: currentPage.value, size: pageSize }
+    const params = { page: currentPage.value, size: pageSize, limit: pageSize }
     if (searchKey.value) Object.assign(params, { key: searchKey.value })
 
     const res = await apiGetArticleList(params)
     articles.value = res.data?.list || res.data || []
-    total.value = res.data?.total || 0
+    total.value = res.data?.total || res.data?.count || 0
   } catch (e) {
     ElMessage.error('获取文章列表失败')
   } finally {

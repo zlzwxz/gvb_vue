@@ -1,7 +1,7 @@
 <template>
   <div class="image-manage">
-    <el-row justify="space-between" style="margin-bottom:20px;">
-      <el-col>
+    <el-card shadow="never">
+      <div class="toolbar">
         <el-upload
           action="/api/images"
           name="image"
@@ -12,34 +12,36 @@
         >
           <el-icon><Plus /></el-icon>
         </el-upload>
-      </el-col>
-      <el-col>
-        <el-input placeholder="搜索图片" v-model="search" clearable @clear="fetchList" @keyup.enter="fetchList" style="width:200px;" />
-      </el-col>
-    </el-row>
-    <el-table :data="list" style="width: 100%" stripe>
-      <el-table-column prop="id" label="ID" width="60" />
-      <el-table-column prop="name" label="名称" />
-      <el-table-column label="预览" width="120">
-        <template #default="{ row }">
-          <el-image :src="$resolveImg(row.path)" style="width:80px;height:80px;" fit="scale-down" />
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="180">
-        <template #default="{ row }">
-          <el-button type="text" @click="handleRename(row)">重命名</el-button>
-          <el-button type="text" @click="handleDelete(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <el-pagination
-      background
-      layout="prev, pager, next"
-      :page-size="pageSize"
-      :total="total"
-      @current-change="fetchList"
-      style="margin-top:20px; text-align:center;"
-    />
+        <el-input placeholder="搜索图片" v-model="search" clearable @clear="fetchList" @keyup.enter="fetchList" style="width:220px;" />
+      </div>
+
+      <el-table :data="list" stripe v-loading="loading">
+        <el-table-column prop="id" label="ID" width="60" />
+        <el-table-column prop="name" label="名称" />
+        <el-table-column label="预览" width="120">
+          <template #default="{ row }">
+            <el-image :src="$resolveImg(row.path)" style="width:80px;height:80px;" fit="scale-down" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="180">
+          <template #default="{ row }">
+            <el-button type="primary" link @click="handleRename(row)">重命名</el-button>
+            <el-button type="danger" link @click="handleDelete(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <el-empty v-if="!loading && !list.length" description="暂无图片" />
+
+      <el-pagination
+        background
+        layout="total, prev, pager, next"
+        :page-size="pageSize"
+        :total="total"
+        @current-change="fetchList"
+      />
+    </el-card>
+
     <el-dialog title="重命名图片" v-model="showRename">
       <el-input v-model="renameForm.name" placeholder="新名称" />
       <template #footer>
@@ -65,16 +67,23 @@ const uploadHeaders = computed(() => {
 const list = ref([])
 const total = ref(0)
 const pageSize = 12
+const loading = ref(false)
 const search = ref('')
 const showRename = ref(false)
 const renameForm = ref({ id: null, name: '' })
 
 async function fetchList(page = 1) {
-  const params = { page, size: pageSize }
-  if (search.value) params.name = search.value
-  const res = await apiGetImageList(params)
-  list.value = res.data.list || []
-  total.value = res.data.total || 0
+  loading.value = true
+  try {
+    const params = { page, size: pageSize, limit: pageSize }
+    if (search.value) params.name = search.value
+    const res = await apiGetImageList(params)
+    const data = res.data || {}
+    list.value = data.list || []
+    total.value = data.total || data.count || 0
+  } finally {
+    loading.value = false
+  }
 }
 
 function beforeUpload(file) {
@@ -112,5 +121,11 @@ onMounted(() => fetchList())
 </script>
 
 <style scoped>
-.image-manage { padding: 20px; }
+.toolbar {
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
 </style>

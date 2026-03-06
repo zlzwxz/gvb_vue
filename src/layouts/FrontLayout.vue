@@ -3,41 +3,70 @@
     <header class="header">
       <div class="header-inner">
         <div class="logo-area" @click="goHome">
-          <span class="logo-main">{{ settings.site_name || '枫枫知道' }}</span>
-          <span class="logo-sub">FFENGZHIDAO</span>
+          <span class="logo-main">{{ settings.site_name || 'GVB 社区' }}</span>
+          <span class="logo-sub">Community Forum</span>
         </div>
-        <div class="nav-menu">
-          <a v-for="menu in menus" :key="menu.id" 
-             @click="goToMenu(menu.path)" 
-             class="nav-item"
-             :class="{'is-active': $route.path === menu.path || ($route.path === '/' && menu.path === '/index') }">
+
+        <nav class="nav-menu">
+          <a
+            v-for="menu in menus"
+            :key="menu.id"
+            class="nav-item"
+            :class="{ 'is-active': isActiveMenu(menu.path) }"
+            @click="goToMenu(menu.path)"
+          >
             {{ menu.title }}
           </a>
-        </div>
+        </nav>
+
         <div class="header-right">
+          <el-button class="publish-btn" type="primary" @click="goPublish">
+            <el-icon><Plus /></el-icon>
+            发布主题
+          </el-button>
           <el-icon class="search-icon" @click="goTo('Search')"><Search /></el-icon>
-          <div class="user-action">
-            <template v-if="!userStore.isLoggedIn">
-              <span @click="goTo('Login')" class="login-text">登录</span>
-              <span @click="goTo('Register')" class="login-text" style="margin-left: 12px">注册</span>
-            </template>
-            <template v-else>
-              <div class="logged-in-area">
-                <div class="user-block" @click="goTo('Profile')">
-                  <el-avatar :size="32" :src="$resolveImg(userStore.userInfo?.avatar)" />
-                  <span class="nick-name">{{ userStore.userInfo?.nick_name || userStore.userInfo?.user_name || '我的' }}</span>
-                </div>
-                <span class="nav-btn admin-btn" @click="goToAdmin">后台管理</span>
-                <span class="nav-btn logout-btn" @click="handleLogout">注销</span>
-              </div>
-            </template>
-          </div>
+          <span class="text-btn" @click="goTo('Games')">小游戏</span>
+          <template v-if="!userStore.isLoggedIn">
+            <span class="text-btn" @click="goTo('Login')">登录</span>
+            <span class="text-btn" @click="goTo('Register')">注册</span>
+          </template>
+          <template v-else>
+            <div class="user-block" @click="goTo('Profile')">
+              <el-avatar :size="30" :src="$resolveImg(userStore.userInfo?.avatar)" />
+              <span class="nick-name">{{ userStore.userInfo?.nick_name || userStore.userInfo?.user_name || '我的' }}</span>
+            </div>
+            <span class="text-btn" @click="goTo('PrivateMessages')">私信</span>
+            <span class="text-btn admin" @click="goToAdmin">后台</span>
+            <span class="text-btn logout" @click="handleLogout">退出</span>
+          </template>
+        </div>
+      </div>
+
+      <div class="metrics-strip" v-if="metrics.article_count > 0">
+        <div class="metrics-inner">
+          <div class="metric-item"><span>文章</span><strong>{{ metrics.article_count }}</strong></div>
+          <div class="metric-item"><span>阅读</span><strong>{{ metrics.look_total || metrics.article_count * 10 }}</strong></div>
+          <div class="metric-item"><span>互动</span><strong>{{ (metrics.comment_total || 0) + (metrics.digg_total || 0) }}</strong></div>
+          <div class="metric-item"><span>今日登录</span><strong>{{ metrics.now_login_count || 0 }}</strong></div>
         </div>
       </div>
     </header>
+
     <main class="main-content">
       <router-view />
     </main>
+
+    <div class="float-nav">
+      <el-button class="float-btn top-btn" type="primary" @click="scrollToTop" :disabled="!showFloatNav">
+        <el-icon><ArrowUpBold /></el-icon>
+        <span>回顶部</span>
+      </el-button>
+      <el-button class="float-btn bottom-btn" @click="scrollToBottom">
+        <el-icon><ArrowDownBold /></el-icon>
+        <span>到底部</span>
+      </el-button>
+    </div>
+
     <footer class="footer">
       <div v-html="settings.site_copyright"></div>
       <div>{{ settings.site_icp }}</div>
@@ -46,15 +75,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { Search, ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDownBold, ArrowUpBold, Plus, Search } from '@element-plus/icons-vue'
 import { apiGetMenuList } from '@/api/menu'
-import { apiGetSettings } from '@/api/system'
+import { apiGetDataSum, apiGetSettings } from '@/api/system'
 import { ElMessage } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 const menus = ref([])
@@ -64,41 +94,74 @@ const settings = ref({
   site_icp: ''
 })
 
+const metrics = ref({
+  article_count: 0,
+  look_total: 0,
+  comment_total: 0,
+  digg_total: 0,
+  now_login_count: 0
+})
+const showFloatNav = ref(false)
+
 async function fetchLayoutData() {
   try {
-    const [menuRes, setRes] = await Promise.all([
-      apiGetMenuList({ size: 10 }),
-      apiGetSettings('site')
+    const [menuRes, setRes, sumRes] = await Promise.all([
+      apiGetMenuList({ size: 30 }),
+      apiGetSettings('site'),
+      apiGetDataSum()
     ])
-    // Filter and sort menus to show only visible ones
-    menus.value = (menuRes.data?.list || menuRes.data || []).sort((a,b) => a.sort - b.sort)
+
+    menus.value = (menuRes.data?.list || menuRes.data || []).sort((a, b) => Number(a.sort || 0) - Number(b.sort || 0))
     settings.value = setRes.data || {}
-    document.title = settings.value.site_name || 'GVB博客'
+    const sum = sumRes.data || {}
+    metrics.value = {
+      article_count: sum.article_count || 0,
+      look_total: sum.look_total || 0,
+      comment_total: sum.comment_total || 0,
+      digg_total: sum.digg_total || 0,
+      now_login_count: sum.now_login_count || 0
+    }
+    document.title = settings.value.site_name || 'GVB社区'
   } catch (e) {
-    console.error('获取基础配置失败', e)
+    console.error('获取布局数据失败', e)
   }
 }
 
-function goHome() { router.push('/') }
-function goTo(name) { router.push({ name }) }
+function normalizePath(path) {
+  if (!path || path === '/index') return '/'
+  return path.replace(/\/+$/, '') || '/'
+}
+
+function isActiveMenu(path) {
+  return normalizePath(route.path) === normalizePath(path)
+}
+
+function goHome() {
+  router.push('/')
+}
+
+function goTo(name) {
+  router.push({ name })
+}
+
 function goToMenu(path) {
-  if (path.startsWith('http')) {
+  if (String(path).startsWith('http')) {
     window.open(path, '_blank')
-  } else {
-    router.push(path)
+    return
   }
+  router.push(path)
 }
 
-function handleUserCommand(command) {
-  if (command === 'logout') {
-    userStore.logout()
-    ElMessage.success('已退出登录')
-    router.push('/')
-  } else if (command === 'admin') {
-    router.push('/admin')
-  } else if (command === 'profile') {
-    router.push('/profile')
+function goPublish() {
+  if (!userStore.isLoggedIn) {
+    router.push({ path: '/login', query: { redirect: '/admin/article/edit' } })
+    return
   }
+  router.push('/admin/article/edit')
+}
+
+function goToAdmin() {
+  router.push('/admin')
 }
 
 function handleLogout() {
@@ -107,12 +170,31 @@ function handleLogout() {
   router.push('/')
 }
 
-function goToAdmin() {
-  router.push('/admin')
+function onScroll() {
+  const top = window.scrollY || document.documentElement.scrollTop || 0
+  showFloatNav.value = top > 300
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function scrollToBottom() {
+  const h = Math.max(
+    document.body.scrollHeight,
+    document.documentElement.scrollHeight
+  )
+  window.scrollTo({ top: h, behavior: 'smooth' })
 }
 
 onMounted(() => {
   fetchLayoutData()
+  window.addEventListener('scroll', onScroll, { passive: true })
+  onScroll()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onScroll)
 })
 </script>
 
@@ -126,127 +208,207 @@ onMounted(() => {
 .header {
   position: sticky;
   top: 0;
-  z-index: 100;
-  background-color: var(--bg-card);
-  border-bottom: 1px solid var(--border-color);
-  height: 60px;
+  z-index: 120;
+  border-bottom: 1px solid #dce7f2;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(8px);
+}
+
+.header-inner,
+.metrics-inner {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 0 16px;
 }
 
 .header-inner {
-  max-width: 1200px;
-  margin: 0 auto;
-  height: 100%;
-  display: flex;
+  height: 62px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
+  gap: 14px;
 }
 
 .logo-area {
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  justify-content: center;
 }
+
 .logo-main {
   font-size: 18px;
-  font-weight: bold;
-  color: var(--text-primary);
-  line-height: 1;
+  font-weight: 800;
+  color: #12385c;
 }
+
 .logo-sub {
   font-size: 10px;
-  color: var(--text-muted);
-  margin-top: 2px;
-  letter-spacing: 1px;
+  color: #6c819b;
 }
 
 .nav-menu {
-  flex: 1;
   display: flex;
   align-items: center;
-  margin-left: 40px;
+  gap: 10px;
+  overflow-x: auto;
+  white-space: nowrap;
 }
+
 .nav-item {
-  margin-right: 24px;
+  font-size: 14px;
   color: var(--text-primary);
-  font-size: 15px;
+  padding: 6px 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s ease;
 }
-.nav-item:hover {
-  color: var(--primary-color);
-}
+
+.nav-item:hover,
 .nav-item.is-active {
-  color: var(--primary-color);
-  font-weight: bold;
-  transform: scale(1.15);
+  color: #0f7ea5;
+  background: #eaf6fc;
 }
 
 .header-right {
   display: flex;
   align-items: center;
+  gap: 8px;
 }
+
+.publish-btn {
+  border-radius: 10px;
+}
+
 .search-icon {
-  font-size: 20px;
-  color: var(--text-primary);
-  margin-right: 20px;
+  font-size: 18px;
+  color: #45637f;
   cursor: pointer;
 }
-.login-text {
-  font-size: 14px;
+
+.user-block {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f4f9fc;
+  border-radius: 999px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.nick-name,
+.text-btn {
+  font-size: 13px;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: color 0.3s;
 }
-.login-text:hover {
-  color: var(--primary-color);
+
+.text-btn.admin {
+  color: #0f7ea5;
+  font-weight: 700;
 }
-.logged-in-area {
+
+.text-btn.logout {
+  color: #dc2626;
+}
+
+.metrics-strip {
+  border-top: 1px solid #e7edf5;
+  background: #f7fbff;
+}
+
+.metrics-inner {
+  min-height: 34px;
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 5px;
+  padding-bottom: 5px;
 }
-.user-block {
-  display: flex;
+
+.metric-item {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  cursor: pointer;
+  gap: 5px;
+  font-size: 12px;
+  color: #4d6783;
 }
-.user-block .nick-name {
-  font-size: 14px;
-  color: var(--text-primary);
-}
-.nav-btn {
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-.admin-btn {
-  color: var(--primary-color);
-  font-weight: 600;
-}
-.logout-btn {
-  color: #f56c6c;
-}
-.nav-btn:hover {
-  opacity: 0.8;
-  text-decoration: underline;
+
+.metric-item strong {
+  color: #0f7ea5;
 }
 
 .main-content {
   flex: 1;
   width: 100%;
-  max-width: 1200px;
-  margin: 20px auto;
-  padding: 0 10px;
+  max-width: 1260px;
+  margin: 14px auto;
+  padding: 0 12px;
 }
 
 .footer {
   text-align: center;
   padding: 20px;
   color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.8;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.float-nav {
+  position: fixed;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 130;
+  display: grid;
+  gap: 10px;
+}
+
+.float-btn {
+  min-width: 92px;
+  height: 38px;
+  font-size: 12px;
+  border-radius: 999px;
+  border: 1px solid #cfe1ef;
+  box-shadow: 0 6px 16px rgba(17, 58, 92, 0.14);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.bottom-btn {
+  background: #fff;
+  color: #2f4f70;
+}
+
+.bottom-btn:hover {
+  color: #0f7ea5;
+  border-color: #a9cae3;
+}
+
+@media (max-width: 992px) {
+  .header-inner {
+    height: auto;
+    padding-top: 8px;
+    padding-bottom: 8px;
+    grid-template-columns: 1fr;
+  }
+
+  .header-right {
+    flex-wrap: wrap;
+  }
+
+  .float-nav {
+    right: 10px;
+    top: auto;
+    bottom: 14px;
+    transform: none;
+  }
+
+  .float-btn {
+    min-width: 84px;
+    height: 34px;
+    font-size: 11px;
+  }
 }
 </style>
