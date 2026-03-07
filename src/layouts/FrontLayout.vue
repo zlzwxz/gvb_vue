@@ -3,7 +3,7 @@
     <header class="header">
       <div class="header-inner">
         <div class="logo-area" @click="goHome">
-          <span class="logo-main">{{ settings.site_name || 'GVB 社区' }}</span>
+          <span class="logo-main">{{ settings.site_name || settings.title || 'GVB 社区' }}</span>
           <span class="logo-sub">Community Forum</span>
         </div>
 
@@ -67,25 +67,31 @@
       </el-button>
     </div>
 
+    <FriendFloatPanel />
+
     <footer class="footer">
-      <div v-html="settings.site_copyright"></div>
-      <div>{{ settings.site_icp }}</div>
+      <div v-html="safeCopyright"></div>
+      <div>{{ settings.site_icp || settings.bei_an }}</div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { useSocialStore } from '@/stores/social'
 import { ArrowDownBold, ArrowUpBold, Plus, Search } from '@element-plus/icons-vue'
 import { apiGetMenuList } from '@/api/menu'
-import { apiGetDataSum, apiGetSettings } from '@/api/system'
+import { apiGetDataSum, apiGetPublicSiteInfo } from '@/api/system'
 import { ElMessage } from 'element-plus'
+import DOMPurify from 'dompurify'
+import FriendFloatPanel from '@/components/social/FriendFloatPanel.vue'
 
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const socialStore = useSocialStore()
 
 const menus = ref([])
 const settings = ref({
@@ -102,12 +108,20 @@ const metrics = ref({
   now_login_count: 0
 })
 const showFloatNav = ref(false)
+const safeCopyright = computed(() => {
+  const html = settings.value.site_copyright || settings.value.profile || ''
+  return DOMPurify.sanitize(String(html), {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
+    ALLOW_UNKNOWN_PROTOCOLS: false
+  })
+})
 
 async function fetchLayoutData() {
   try {
     const [menuRes, setRes, sumRes] = await Promise.all([
       apiGetMenuList({ size: 30 }),
-      apiGetSettings('site'),
+      apiGetPublicSiteInfo(),
       apiGetDataSum()
     ])
 
@@ -121,7 +135,7 @@ async function fetchLayoutData() {
       digg_total: sum.digg_total || 0,
       now_login_count: sum.now_login_count || 0
     }
-    document.title = settings.value.site_name || 'GVB社区'
+    document.title = settings.value.site_name || settings.value.title || 'GVB社区'
   } catch (e) {
     console.error('获取布局数据失败', e)
   }
@@ -165,6 +179,7 @@ function goToAdmin() {
 }
 
 function handleLogout() {
+  socialStore.stop()
   userStore.logout()
   ElMessage.success('已退出登录')
   router.push('/')
@@ -193,8 +208,21 @@ onMounted(() => {
   onScroll()
 })
 
+watch(
+  () => userStore.isLoggedIn,
+  async (value) => {
+    if (value) {
+      await socialStore.ensureStarted()
+      return
+    }
+    socialStore.stop()
+  },
+  { immediate: true }
+)
+
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScroll)
+  socialStore.stop()
 })
 </script>
 

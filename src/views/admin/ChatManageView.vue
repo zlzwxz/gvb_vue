@@ -43,7 +43,7 @@
             :on-success="handleUploadSuccess"
           >
             <el-button type="primary" size="small">上传封面</el-button>
-            <div v-if="form.avatar" class="cover-preview"><img :src="form.avatar" alt="封面" style="width: 100px; margin-top: 10px;" /></div>
+            <div v-if="form.avatar" class="cover-preview"><img :src="$resolveImg(form.avatar)" alt="封面" style="width: 100px; margin-top: 10px;" /></div>
           </el-upload>
         </el-form-item>
         <el-form-item label="成员ID" prop="user_ids">

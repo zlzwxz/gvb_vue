@@ -97,6 +97,34 @@
                 <div class="form-tip">兼容旧配置字段，通常只需要维护上面的“启用来源(推荐)”。</div>
               </el-form-item>
             </template>
+
+            <template v-if="tab.name === 'site_info'">
+              <el-divider />
+              <el-form-item label="采集操作">
+                <div class="crawl-action-block">
+                  <div class="crawl-action-row">
+                    <el-button type="primary" plain :loading="previewing" @click="previewFengfengSync">
+                      检测最新文章
+                    </el-button>
+                    <el-button type="primary" :loading="syncing" @click="triggerFengfengSync">
+                      立即同步枫枫知道文章
+                    </el-button>
+                  </div>
+                  <div v-if="crawlStat" class="crawl-stat">
+                    来源总数：{{ Number(crawlStat.source_total || 0) }}，
+                    本次扫描：{{ Number(crawlStat.latest_scanned || 0) }}，
+                    可新增：{{ Number(crawlStat.new_candidate || 0) }}，
+                    已更新：{{ Number(crawlStat.updated_count || 0) }}，
+                    重复：{{ Number(crawlStat.duplicate_count || 0) }}，
+                    无效：{{ Number(crawlStat.invalid_count || 0) }}，
+                    失败：{{ Number(crawlStat.failed_count || 0) }}
+                  </div>
+                  <div class="form-tip">
+                    开启“自动抓取”后，后端会按小时定时抓取；这里可手动触发一次并写入文章列表。
+                  </div>
+                </div>
+              </el-form-item>
+            </template>
           </el-form>
         </el-tab-pane>
       </el-tabs>
@@ -107,10 +135,13 @@
 <script setup>
 import { onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { apiGetNewsSourceList, apiGetSettings, apiUpdateSetting } from '@/api/system'
+import { apiGetNewsSourceList, apiGetPublicSiteInfo, apiGetSettings, apiPreviewFengfengArticles, apiSyncFengfengArticles, apiUpdateSetting } from '@/api/system'
 
 const loading = ref(false)
 const saving = ref(false)
+const syncing = ref(false)
+const previewing = ref(false)
+const crawlStat = ref(null)
 const activeTab = ref('system')
 const newsSourceList = ref([])
 
@@ -230,6 +261,12 @@ const schemaMap = {
       { key: 'web', label: '站点地址', type: 'text', fullLine: true },
       { key: 'qq_image', label: 'QQ 图片', type: 'text', fullLine: true },
       { key: 'wechat_image', label: '微信图片', type: 'text', fullLine: true },
+      { key: 'profile', label: '个人介绍', type: 'text', fullLine: true },
+      { key: 'contact', label: '联系方式', type: 'text', fullLine: true },
+      { key: 'service_url', label: '客服跳转地址', type: 'text', fullLine: true },
+      { key: 'auto_crawl_fengfeng_articles', label: '自动抓取枫枫文章', type: 'bool' },
+      { key: 'crawler_user_name', label: '系统员账号', type: 'text' },
+      { key: 'crawler_nick_name', label: '系统员昵称', type: 'text' },
       { key: 'bilibili_url', label: 'Bilibili', type: 'text', fullLine: true },
       { key: 'gitee_url', label: 'Gitee', type: 'text', fullLine: true },
       { key: 'github_url', label: 'GitHub', type: 'text', fullLine: true }
@@ -291,7 +328,7 @@ async function loadConfigByName(name = activeTab.value) {
       await loadNewsSources()
     }
 
-    const res = await apiGetSettings(name)
+    const res = name === 'site_info' ? await apiGetSettings(name).catch(async () => apiGetPublicSiteInfo()) : await apiGetSettings(name)
     const rawData = res.data || {}
     const data = name === 'email' ? normalizeEmailData(rawData) : rawData
 
@@ -351,6 +388,42 @@ async function saveCurrent() {
   }
 }
 
+async function triggerFengfengSync() {
+  // 管理员手动触发一次抓取，便于开关后立即验证效果。
+  syncing.value = true
+  try {
+    const res = await apiSyncFengfengArticles()
+    crawlStat.value = res?.data || null
+    const created = Number(res?.data?.created || 0)
+    const updatedCount = Number(res?.data?.updated_count || 0)
+    const duplicateCount = Number(res?.data?.duplicate_count || 0)
+    const failedCount = Number(res?.data?.failed_count || 0)
+    const latestScanned = Number(res?.data?.latest_scanned || 0)
+    ElMessage.success(`同步完成：扫描 ${latestScanned}，新增 ${created}，更新 ${updatedCount}，重复 ${duplicateCount}，失败 ${failedCount}`)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.msg || '同步失败')
+  } finally {
+    syncing.value = false
+  }
+}
+
+async function previewFengfengSync() {
+  previewing.value = true
+  try {
+    const res = await apiPreviewFengfengArticles()
+    crawlStat.value = res?.data || null
+    const sourceTotal = Number(res?.data?.source_total || 0)
+    const latestScanned = Number(res?.data?.latest_scanned || 0)
+    const newCandidate = Number(res?.data?.new_candidate || 0)
+    const duplicateCount = Number(res?.data?.duplicate_count || 0)
+    ElMessage.success(`检索完成：来源 ${sourceTotal}，扫描 ${latestScanned}，可新增 ${newCandidate}，重复 ${duplicateCount}`)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.msg || '检索失败')
+  } finally {
+    previewing.value = false
+  }
+}
+
 watch(activeTab, (name) => {
   loadConfigByName(name)
 }, { immediate: true })
@@ -404,6 +477,23 @@ onMounted(() => {
   font-size: 12px;
   color: #7d91a9;
   line-height: 1.6;
+}
+
+.crawl-action-block {
+  display: grid;
+  gap: 8px;
+}
+
+.crawl-action-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.crawl-stat {
+  font-size: 12px;
+  color: #456b92;
+  line-height: 1.7;
 }
 
 @media (max-width: 900px) {

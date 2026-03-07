@@ -32,6 +32,10 @@
             <el-option label="已通过" :value="2" />
             <el-option label="已驳回" :value="3" />
           </el-select>
+          <el-select v-model="boardFilter" style="width: 160px" clearable placeholder="全部板块" @change="fetchList(1)">
+            <el-option label="全部板块" :value="0" />
+            <el-option v-for="board in boardOptions" :key="board.id" :label="board.name" :value="board.id" />
+          </el-select>
         </div>
       </div>
 
@@ -52,9 +56,16 @@
             <el-button type="primary" link @click="goEdit(row.id)">{{ row.title }}</el-button>
           </template>
         </el-table-column>
-        <el-table-column prop="category" label="分类" width="140">
+        <el-table-column prop="board_name" label="板块" width="140">
           <template #default="{ row }">
-            <el-tag size="small" effect="plain">{{ row.category || '未分类' }}</el-tag>
+            <el-tag size="small" effect="plain">{{ row.board_name || row.category || '未分类' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="duplicate_rate" label="重复率" width="100">
+          <template #default="{ row }">
+            <el-tag :type="duplicateTagType(row.duplicate_rate)" effect="plain" size="small">
+              {{ formatDuplicateRate(row.duplicate_rate) }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="look_count" label="浏览" width="90" />
@@ -65,6 +76,13 @@
           <template #default="{ row }">
             <el-tag :type="statusTagType(row.review_status)" effect="plain" size="small">
               {{ statusText(row.review_status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="is_private" label="可见性" width="110">
+          <template #default="{ row }">
+            <el-tag :type="row.is_private ? 'warning' : 'success'" effect="plain" size="small">
+              {{ row.is_private ? '私密' : '公开' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -106,6 +124,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiDeleteArticle, apiGetArticleList } from '@/api/article'
+import { apiGetBoardList } from '@/api/board'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
@@ -120,6 +139,8 @@ const loading = ref(false)
 const search = ref('')
 const sort = ref('created_at desc')
 const reviewStatus = ref(0)
+const boardFilter = ref(0)
+const boardOptions = ref([])
 
 function goCreate() {
   router.push({ name: 'ArticleEdit' })
@@ -148,6 +169,17 @@ function statusTagType(status) {
   return 'success'
 }
 
+function formatDuplicateRate(value) {
+  return `${Number(value || 0).toFixed(1)}%`
+}
+
+function duplicateTagType(value) {
+  const num = Number(value || 0)
+  if (num >= 70) return 'danger'
+  if (num >= 40) return 'warning'
+  return 'success'
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '-'
   const d = new Date(dateStr)
@@ -169,6 +201,9 @@ async function fetchList(page = 1) {
     if (search.value.trim()) {
       params.key = search.value.trim()
       params.title = search.value.trim()
+    }
+    if (Number(boardFilter.value) > 0) {
+      params.board_id = Number(boardFilter.value)
     }
     if (!userStore.isAdmin) {
       params.is_user = true
@@ -210,6 +245,11 @@ async function handleDelete(id) {
 }
 
 onMounted(() => {
+  apiGetBoardList({ page: 1, limit: 120 }).then((res) => {
+    boardOptions.value = res.data?.list || []
+  }).catch(() => {
+    boardOptions.value = []
+  })
   fetchList(1)
 })
 </script>

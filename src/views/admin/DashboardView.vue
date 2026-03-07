@@ -19,6 +19,13 @@
       </article>
     </section>
 
+    <section v-if="userStore.isAdmin" class="metric-grid admin-metric-grid">
+      <article v-for="item in adminStatItems" :key="item.key" class="metric-card metric-card--accent">
+        <span>{{ item.label }}</span>
+        <strong>{{ adminSumData[item.key] || 0 }}</strong>
+      </article>
+    </section>
+
     <section class="content-grid">
       <el-card class="chart-card" shadow="never">
         <template #header>
@@ -39,6 +46,10 @@
         </template>
         <div class="quick-list">
           <button type="button" class="quick-item" @click="router.push('/admin/articles')">文章管理</button>
+          <button v-if="userStore.isAdmin" type="button" class="quick-item" @click="router.push('/admin/announcements')">公告管理</button>
+          <button type="button" class="quick-item" @click="router.push('/admin/article/reports')">文章举报</button>
+          <button v-if="userStore.isAdmin" type="button" class="quick-item" @click="router.push('/admin/boards')">板块管理</button>
+          <button v-if="userStore.isAdmin" type="button" class="quick-item" @click="router.push('/admin/material/articles')">文章素材</button>
           <button type="button" class="quick-item" @click="router.push('/admin/comments')">评论管理</button>
           <button type="button" class="quick-item" @click="router.push('/admin/messages')">私信管理</button>
           <button type="button" class="quick-item" @click="router.push('/admin/settings')">系统设置</button>
@@ -51,31 +62,54 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { apiGetDataSum, apiGetSevenLoginData } from '@/api/system'
-import * as echarts from 'echarts'
+import { apiGetAdminDataSum, apiGetDataSum, apiGetSevenLoginData } from '@/api/system'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 const sumData = ref({})
+const adminSumData = ref({})
 const chartRef = ref(null)
 const loading = ref(false)
 let chartInstance = null
+let echartsModulePromise = null
 
 const statItems = [
   { key: 'article_count', label: '文章总数' },
   { key: 'user_count', label: '用户总数' },
   { key: 'message_count', label: '私信总数' },
-  { key: 'comment_count', label: '评论总数' },
+  { key: 'comment_total', label: '评论总数' },
   { key: 'now_sign_count', label: '今日登录' },
   { key: 'look_total', label: '总阅读量' }
 ]
 
+const adminStatItems = [
+  { key: 'pending_article_review_count', label: '待复审文章' },
+  { key: 'pending_article_report_count', label: '待处理举报' },
+  { key: 'announcement_count', label: '公告总数' },
+  { key: 'enabled_board_count', label: '启用板块' }
+]
+
 async function fetchDataSum() {
-  const res = await apiGetDataSum()
-  sumData.value = res.data || {}
+  const baseRes = await apiGetDataSum()
+  sumData.value = baseRes.data || {}
+
+  if (!userStore.isAdmin) {
+    adminSumData.value = {}
+    return
+  }
+
+  try {
+    const adminRes = await apiGetAdminDataSum()
+    adminSumData.value = adminRes.data || {}
+  } catch {
+    adminSumData.value = {}
+  }
 }
 
 async function renderChart() {
   if (!chartRef.value) return
+  const echarts = await getEcharts()
   if (!chartInstance) {
     chartInstance = echarts.init(chartRef.value)
   }
@@ -115,6 +149,13 @@ async function renderChart() {
       }
     ]
   })
+}
+
+async function getEcharts() {
+  if (!echartsModulePromise) {
+    echartsModulePromise = import('echarts')
+  }
+  return echartsModulePromise
 }
 
 function handleResize() {
@@ -190,11 +231,20 @@ onUnmounted(() => {
   gap: 10px;
 }
 
+.admin-metric-grid {
+  margin-top: -2px;
+}
+
 .metric-card {
   border-radius: 12px;
   padding: 14px;
   background: #fff;
   border: 1px solid #dbe7f2;
+}
+
+.metric-card--accent {
+  background: linear-gradient(180deg, #f8fcff 0%, #eef7ff 100%);
+  border-color: #cfe2f2;
 }
 
 .metric-card span {

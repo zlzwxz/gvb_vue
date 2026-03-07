@@ -22,6 +22,7 @@
             <el-button type="primary" :disabled="checkInInfo.checkedToday" @click="handleCheckIn">
               {{ checkInInfo.checkedToday ? '今日已签到' : '每日签到' }}
             </el-button>
+            <el-button @click="openMySpace">我的空间</el-button>
             <el-button @click="router.push({ name: 'Collect' })">我的收藏</el-button>
             <el-button @click="router.push({ name: 'PrivateMessages' })">我的私信</el-button>
           </div>
@@ -229,6 +230,11 @@ function openBindDialog() {
   bindForm.value.code = ''
   bindForm.value.password = ''
   showBindDialog.value = true
+}
+
+function openMySpace() {
+  if (!userStore.currentUserId) return
+  router.push({ name: 'UserSpace', params: { id: String(userStore.currentUserId) } })
 }
 
 async function sendBindCode() {

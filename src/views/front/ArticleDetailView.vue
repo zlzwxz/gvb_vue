@@ -12,6 +12,7 @@
             <h1 class="hero-title">{{ article.title }}</h1>
             <p class="hero-abstract" v-if="article.abstract">{{ article.abstract }}</p>
             <div class="hero-meta">
+              <el-tag v-if="article.is_private" size="small" type="warning" effect="dark" round class="hero-tag">私密文章</el-tag>
               <el-tag v-for="tag in (article.tags || [])" :key="tag" size="small" effect="dark" round class="hero-tag">{{ tag }}</el-tag>
             </div>
           </div>
@@ -27,20 +28,32 @@
               <span><el-icon><Clock /></el-icon> 发布时间：{{ formatDate(article.created_at) }}</span>
               <el-tag v-for="tag in (article.tags || [])" :key="tag" size="small" type="info" effect="plain" round style="margin-left:6px;">{{ tag }}</el-tag>
             </div>
+            <div class="duplicate-info" v-if="article.duplicate_rate !== undefined">
+              <el-tag :type="duplicateTagType(article.duplicate_rate)" effect="plain">
+                重复率 {{ formatDuplicateRate(article.duplicate_rate) }}
+              </el-tag>
+              <el-button
+                v-if="article.duplicate_target_id"
+                type="primary"
+                link
+                @click="goDuplicateArticle(article.duplicate_target_id)"
+              >
+                可能相似：{{ article.duplicate_target_title || article.duplicate_target_id }}
+              </el-button>
+            </div>
             <el-divider />
             <div class="content-html" v-html="renderedContent"></div>
             <div v-if="Array.isArray(article.attachments) && article.attachments.length" class="attachment-panel">
               <h3>附件下载</h3>
-              <a
+              <button
                 v-for="(item, idx) in article.attachments"
                 :key="`${item.url}-${idx}`"
                 class="attachment-link"
-                :href="normalizeDownloadUrl(item.url)"
-                target="_blank"
-                rel="noopener noreferrer"
+                type="button"
+                @click="downloadAttachment(item)"
               >
                 {{ item.name || `附件 ${idx + 1}` }}
-              </a>
+              </button>
             </div>
 
 
@@ -77,10 +90,15 @@
 
             <div class="comment-list" v-if="comments.length > 0">
               <div class="comment-item" v-for="c in comments" :key="c.id">
-                <el-avatar :src="c.user?.avatar ? $resolveImg(c.user.avatar) : defaultAvatar" :size="40" />
+                <el-avatar
+                  :src="c.user?.avatar ? $resolveImg(c.user.avatar) : defaultAvatar"
+                  :size="40"
+                  class="comment-avatar-link"
+                  @click="goUserSpace(c.user_id, 'profile')"
+                />
                 <div class="comment-body">
                   <div class="comment-header">
-                    <span class="comment-author">{{ getCommentDisplayName(c) }}</span>
+                    <span class="comment-author comment-author-link" @click="goUserSpace(c.user_id, 'posts')">{{ getCommentDisplayName(c) }}</span>
                     <span class="comment-time">IP 属地：{{ formatCommentAddr(c.user?.addr) }} | {{ formatCommentTime(c.created_at) }}</span>
                   </div>
                   <div class="comment-text">{{ c.content }}</div>
@@ -90,10 +108,15 @@
                   </div>
                   <div v-if="c.sub_comments && c.sub_comments.length" class="sub-comments">
                     <div class="comment-item sub" v-for="sc in c.sub_comments" :key="sc.id">
-                      <el-avatar :src="sc.user?.avatar ? $resolveImg(sc.user.avatar) : defaultAvatar" :size="30" />
+                      <el-avatar
+                        :src="sc.user?.avatar ? $resolveImg(sc.user.avatar) : defaultAvatar"
+                        :size="30"
+                        class="comment-avatar-link"
+                        @click="goUserSpace(sc.user_id, 'profile')"
+                      />
                       <div class="comment-body">
                         <div class="comment-header">
-                          <span class="comment-author">
+                          <span class="comment-author comment-author-link" @click="goUserSpace(sc.user_id, 'posts')">
                             {{ getCommentDisplayName(sc) }}
                             <template v-if="sc.parent_comment_id && sc.parent_comment_id !== c.id">
                               <span style="color: var(--text-muted); font-weight: normal; margin: 0 4px">回复</span>
@@ -120,14 +143,24 @@
         <!-- 右侧边栏 -->
         <div class="detail-sidebar">
           <div class="sidebar-card author-card">
-            <el-avatar :size="70" :src="article.user_avatar ? $resolveImg(article.user_avatar) : defaultAvatar" />
-            <h3 class="author-name">{{ article.user_nick_name || article.nick_name || article.user_name || '博主' }}</h3>
+            <el-avatar
+              :size="70"
+              :src="article.user_avatar ? $resolveImg(article.user_avatar) : defaultAvatar"
+              class="author-avatar"
+              @click="goUserSpace(article.user_id)"
+            />
+            <h3 class="author-name" @click="goUserSpace(article.user_id)">{{ article.user_nick_name || article.nick_name || article.user_name || '博主' }}</h3>
             <p class="author-bio">欢迎来到我的主页</p>
             <div class="author-stats">
               <div class="stat-item"><span class="stat-num">{{ article.look_count || 0 }}</span><el-icon><View /></el-icon></div>
               <div class="stat-item"><span class="stat-num">{{ article.digg_count || 0 }}</span><el-icon><Star /></el-icon></div>
               <div class="stat-item"><span class="stat-num">{{ article.comment_count || 0 }}</span><el-icon><ChatDotRound /></el-icon></div>
               <div class="stat-item"><span class="stat-num">{{ article.collects_count || 0 }}</span><el-icon><CollectionTag /></el-icon></div>
+            </div>
+            <div class="author-actions">
+              <el-button size="small" plain @click="goUserSpace(article.user_id, 'profile')">查看资料</el-button>
+              <el-button size="small" @click="goUserSpace(article.user_id)">访问空间</el-button>
+              <el-button v-if="canPrivateMessage(article.user_id)" type="primary" size="small" @click="startPrivateMessage(article.user_id)">发私信</el-button>
             </div>
           </div>
           <div class="sidebar-card toc-card">
@@ -174,6 +207,24 @@
                 <el-icon :size="18"><Top /></el-icon>
                 <span>回到顶部</span>
               </div>
+              <div v-if="canReportArticle" class="action-item" @click="openReportDialog">
+                <el-icon :size="18"><WarningFilled /></el-icon>
+                <span>举报文章</span>
+              </div>
+            </div>
+            <div v-if="canManageCurrentArticle" class="admin-action-box">
+              <el-divider />
+              <div class="admin-action-row">
+                <span>文章私密</span>
+                <el-switch
+                  :model-value="Boolean(article.is_private)"
+                  :loading="privateUpdating"
+                  @change="toggleArticlePrivate"
+                />
+              </div>
+              <el-button type="danger" plain size="small" :loading="deleteLoading" @click="handleDeleteArticle">
+                删除该文章
+              </el-button>
             </div>
           </div>
         </div>
@@ -183,23 +234,72 @@
     <div v-else class="container" style="padding:60px 0;">
       <el-empty description="此文章不存在或已被下架" />
     </div>
+
+    <el-dialog v-model="reportDialogVisible" title="举报文章" width="460px">
+      <el-form label-width="88px">
+        <el-form-item label="举报原因">
+          <el-select v-model="reportForm.reason" placeholder="请选择举报原因" style="width: 100%">
+            <el-option v-for="item in reportReasonOptions" :key="item" :label="item" :value="item" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="补充说明">
+          <el-input
+            v-model="reportForm.content"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="可以补充具体问题，例如广告、抄袭、违规内容等"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="reportDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="reportSubmitting" @click="submitReport">提交举报</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { apiGetArticleDetail, apiDiggArticle, apiCollectArticle, apiGetArticleTOC } from '@/api/article'
+import { apiGetArticleDetail, apiDiggArticle, apiCollectArticle, apiGetArticleTOC, apiUpdateArticle, apiDeleteArticle, apiCreateArticleReport } from '@/api/article'
 import { apiGetCommentList, apiCreateComment } from '@/api/comment'
-import { ElMessage } from 'element-plus'
-import { Clock, View, Star, StarFilled, CollectionTag, ChatDotRound, Lock, Top, ArrowDown, ArrowRight } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Clock, View, Star, StarFilled, CollectionTag, ChatDotRound, Lock, Top, ArrowDown, ArrowRight, WarningFilled } from '@element-plus/icons-vue'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+import request from '@/utils/request'
+import { normalizeRichTextHtml, resolveResourceUrl } from '@/utils/url'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github-dark.css'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const defaultAvatar = 'https://cube.elemecdn.com/3/7c/3ea6beec64369c2642b92c6726f1epng.png'
+
+marked.setOptions({
+  gfm: true,
+  breaks: true
+})
+
+marked.use({
+  renderer: {
+    code(text, language) {
+      const source = String(text || '')
+      const normalizedLanguage = String(language || '').trim().toLowerCase()
+      const finalLanguage = normalizedLanguage && hljs.getLanguage(normalizedLanguage) ? normalizedLanguage : ''
+      const highlighted = finalLanguage
+        ? hljs.highlight(source, { language: finalLanguage, ignoreIllegals: true }).value
+        : hljs.highlightAuto(source).value
+      const languageClass = finalLanguage ? ` language-${finalLanguage}` : ''
+      return `<pre class="article-code-block"><code class="hljs${languageClass}">${highlighted}</code></pre>`
+    }
+  }
+})
 
 const article = ref(null)
 const loading = ref(true)
@@ -212,6 +312,24 @@ const commentInputRef = ref(null)
 const replyTo = ref(null)
 const tocData = ref([])
 const tocCollapsed = ref(false)
+const privateUpdating = ref(false)
+const deleteLoading = ref(false)
+const reportDialogVisible = ref(false)
+const reportSubmitting = ref(false)
+const reportForm = ref({
+  reason: '',
+  content: ''
+})
+const reportReasonOptions = ['广告引流', '抄袭搬运', '涉政涉黄', '辱骂攻击', '虚假信息', '其它违规']
+
+const canManageCurrentArticle = computed(() => {
+  if (!article.value) return false
+  return userStore.isAdmin || Number(article.value.user_id) === Number(userStore.currentUserId)
+})
+const canReportArticle = computed(() => {
+  if (!article.value) return false
+  return Number(article.value.user_id) !== Number(userStore.currentUserId)
+})
 
 // Token过期处理函数
 function handleTokenExpired() {
@@ -225,17 +343,40 @@ function handleTokenExpired() {
 }
 
 function getBannerStyle(url) {
-  if (!url) {
+  const finalUrl = resolveResourceUrl(url)
+  if (!finalUrl) {
     return { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }
   }
-  let finalUrl = url.startsWith('http') ? url : (url.startsWith('/') ? url : '/' + url)
-  // Wrap in quotes to handle spaces in filenames
-  return { backgroundImage: `url('${finalUrl}')` }
+  return { backgroundImage: `url("${finalUrl}")` }
+}
+
+function looksLikeEscapedMarkdown(content) {
+  const text = String(content || '')
+  return /\\`{3,}|(^|\n)\\#{1,6}\s|(^|\n)\d+\\\.\s|\\\[[^\]]+\]\([^)]+\)|(^|\n)\\[-*+]\s|\\[\\`*_[\]()#+\-.!>~|]/m.test(text)
+}
+
+function normalizeArticleMarkdown(content) {
+  let text = String(content || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+  if (looksLikeEscapedMarkdown(text)) {
+    text = text.replace(/\\([\\`*_[\]()#+\-.!>~|])/g, '$1')
+  }
+  return text.replace(/(^|\n)```([A-Za-z][\w+-]*)/g, (_, prefix, lang) => `${prefix}\`\`\`${String(lang).toLowerCase()}`)
+}
+
+function renderMarkdownContent(content) {
+  const raw = marked.parse(normalizeArticleMarkdown(content))
+  const sanitized = DOMPurify.sanitize(raw, {
+    USE_PROFILES: { html: true },
+    FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form'],
+    ADD_ATTR: ['class', 'target', 'rel'],
+    ALLOW_UNKNOWN_PROTOCOLS: false
+  })
+  return normalizeRichTextHtml(sanitized)
 }
 
 const renderedContent = computed(() => {
   if (!article.value?.content) return ''
-  return marked.parse(article.value.content)
+  return renderMarkdownContent(article.value.content)
 })
 
 function formatDate(dateStr) {
@@ -257,6 +398,63 @@ function normalizeDownloadUrl(url) {
   return `/${value}`
 }
 
+function parseAttachmentFileId(url) {
+  const normalized = normalizeDownloadUrl(url)
+  const matched = normalized.match(/\/api\/files\/(\d+)\/download/i)
+  if (!matched) return ''
+  return matched[1]
+}
+
+function resolveDownloadFileName(disposition, fallback) {
+  const value = String(disposition || '')
+  const utf8Match = value.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match && utf8Match[1]) {
+    try {
+      return decodeURIComponent(utf8Match[1])
+    } catch {
+      return utf8Match[1]
+    }
+  }
+  const plainMatch = value.match(/filename="?([^\";]+)"?/i)
+  if (plainMatch && plainMatch[1]) return plainMatch[1]
+  return fallback || `附件_${Date.now()}`
+}
+
+async function downloadAttachment(item) {
+  const fileId = parseAttachmentFileId(item?.url)
+  if (!fileId) {
+    ElMessage.warning('附件地址不合法')
+    return
+  }
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再下载附件')
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+
+  try {
+    const response = await request.get(`/files/${fileId}/download`, {
+      responseType: 'blob'
+    })
+    const fileName = resolveDownloadFileName(
+      response.headers?.['content-disposition'],
+      item?.name || `附件_${fileId}`
+    )
+
+    const blobData = response.data instanceof Blob ? response.data : new Blob([response.data])
+    const blobUrl = window.URL.createObjectURL(blobData)
+    const link = document.createElement('a')
+    link.href = blobUrl
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(blobUrl)
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.msg || e?.message || '附件下载失败')
+  }
+}
+
 function formatCommentTime(dateStr) {
   if (!dateStr) return '未知'
   const d = new Date(dateStr)
@@ -271,6 +469,23 @@ function formatCommentAddr(addr) {
   return addr
 }
 
+function formatDuplicateRate(value) {
+  const num = Number(value || 0)
+  return `${num.toFixed(1)}%`
+}
+
+function duplicateTagType(value) {
+  const num = Number(value || 0)
+  if (num >= 70) return 'danger'
+  if (num >= 40) return 'warning'
+  return 'success'
+}
+
+function goDuplicateArticle(id) {
+  if (!id) return
+  router.push({ name: 'ArticleDetail', params: { id: String(id) } })
+}
+
 function getCommentDisplayName(comment) {
   if (!comment) return '匿名'
   const nickName = String(comment.user?.nick_name || comment.user_nick_name || '').trim()
@@ -282,12 +497,36 @@ function getCommentDisplayName(comment) {
   return comment.user_id ? `用户${comment.user_id}` : '匿名'
 }
 
+const commentNameMap = computed(() => {
+  // 把当前评论树拍平成 `comment_id -> display_name`，用于子评论 @ 用户兜底显示。
+  const map = new Map()
+  for (const root of comments.value) {
+    map.set(Number(root.id), getCommentDisplayName(root))
+    if (Array.isArray(root.sub_comments)) {
+      for (const child of root.sub_comments) {
+        map.set(Number(child.id), getCommentDisplayName(child))
+      }
+    }
+  }
+  return map
+})
+
 function canPrivateMessage(userId) {
   return userStore.isLoggedIn && Number(userId) > 0 && Number(userId) !== Number(userStore.currentUserId)
 }
 
 function startPrivateMessage(userId) {
   router.push({ name: 'PrivateMessages', query: { user_id: String(userId) } })
+}
+
+function goUserSpace(userId, tab = 'posts') {
+  const target = Number(userId || 0)
+  if (!target) return
+  router.push({
+    name: 'UserSpace',
+    params: { id: String(target) },
+    query: tab === 'posts' ? {} : { tab }
+  })
 }
 
 async function loadArticleTOC() {
@@ -361,6 +600,11 @@ async function loadComments() {
 }
 
 async function handleDigg() {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再点赞')
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
   if (hasDigged.value) return ElMessage.info('您已经点过赞了')
   try {
     await apiDiggArticle({ id: article.value.id })
@@ -608,16 +852,99 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function resetReportForm() {
+  reportForm.value = {
+    reason: '',
+    content: ''
+  }
+}
+
+function openReportDialog() {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后再举报文章')
+    router.push({ path: '/login', query: { redirect: route.fullPath } })
+    return
+  }
+  resetReportForm()
+  reportDialogVisible.value = true
+}
+
 
 // 获取子评论中@的用户名称
 function getCommentUser(subComment, parentComment) {
   if (subComment.comment_model?.user) {
     return getCommentDisplayName(subComment.comment_model)
   }
-  if (subComment.parent_comment_id === parentComment.id) {
+  const parentID = Number(subComment.parent_comment_id || 0)
+  if (parentID && commentNameMap.value.has(parentID)) {
+    return commentNameMap.value.get(parentID)
+  }
+  if (parentID === Number(parentComment?.id || 0)) {
     return getCommentDisplayName(parentComment)
   }
   return '匿名'
+}
+
+async function toggleArticlePrivate(value) {
+  // 详情页直接更新可见性，管理员无需返回后台列表页再操作。
+  if (!article.value?.id || !canManageCurrentArticle.value) return
+  privateUpdating.value = true
+  const oldValue = Boolean(article.value.is_private)
+  article.value.is_private = Boolean(value)
+  try {
+    await apiUpdateArticle({
+      id: String(article.value.id),
+      is_private: Boolean(value)
+    })
+    ElMessage.success(Boolean(value) ? '已设为私密文章' : '已设为公开文章')
+  } catch (e) {
+    article.value.is_private = oldValue
+    ElMessage.error(e?.response?.data?.msg || '可见性更新失败')
+  } finally {
+    privateUpdating.value = false
+  }
+}
+
+async function handleDeleteArticle() {
+  if (!article.value?.id || !canManageCurrentArticle.value) return
+  try {
+    await ElMessageBox.confirm('确定删除当前文章吗？删除后不可恢复。', '删除确认', { type: 'warning' })
+  } catch {
+    return
+  }
+  deleteLoading.value = true
+  try {
+    await apiDeleteArticle({ id_list: [String(article.value.id)] })
+    ElMessage.success('文章已删除')
+    router.replace('/')
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.msg || '删除失败')
+  } finally {
+    deleteLoading.value = false
+  }
+}
+
+async function submitReport() {
+  if (!article.value?.id) return
+  if (!reportForm.value.reason) {
+    ElMessage.warning('请选择举报原因')
+    return
+  }
+  reportSubmitting.value = true
+  try {
+    await apiCreateArticleReport({
+      article_id: String(article.value.id),
+      reason: reportForm.value.reason,
+      content: String(reportForm.value.content || '').trim()
+    })
+    ElMessage.success('举报已提交')
+    reportDialogVisible.value = false
+    resetReportForm()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.msg || e?.message || '举报提交失败')
+  } finally {
+    reportSubmitting.value = false
+  }
 }
 
 async function submitComment() {
@@ -650,6 +977,23 @@ async function submitComment() {
 }
 
 onMounted(() => { loadArticle(); loadComments() })
+
+watch(renderedContent, async () => {
+  await nextTick()
+  syncTocWithContent()
+}, { flush: 'post' })
+
+watch(() => route.params.id, async (value, oldValue) => {
+  if (!value || value === oldValue) return
+  replyTo.value = null
+  commentContent.value = ''
+  comments.value = []
+  tocData.value = []
+  reportDialogVisible.value = false
+  resetReportForm()
+  await loadArticle()
+  await loadComments()
+})
 </script>
 
 <style scoped>
@@ -683,13 +1027,18 @@ onMounted(() => { loadArticle(); loadComments() })
 .article-card { background: var(--bg-card); border-radius: 12px; padding: 36px 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); margin-bottom: 24px; }
 .article-title { font-size: 24px; font-weight: 700; color: var(--text-primary); margin: 0 0 12px; }
 .article-meta { font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.duplicate-info { margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .content-html { line-height: 1.8; font-size: 15px; color: var(--text-primary); }
 .content-html :deep(h1), .content-html :deep(h2), .content-html :deep(h3), .content-html :deep(h4), .content-html :deep(h5), .content-html :deep(h6) { margin-top: 28px; margin-bottom: 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
 .content-html :deep(h4), .content-html :deep(h5), .content-html :deep(h6) { border-bottom: none; margin-top: 20px; padding-bottom: 0; }
 .content-html :deep(.toc-highlight) { background: rgba(64,158,255,0.14); border-radius: 6px; transition: background 0.3s ease; }
+.content-html :deep(pre) { background: #0f172a; border-radius: 12px; padding: 16px; overflow-x: auto; margin: 18px 0; }
+.content-html :deep(pre code) { background: transparent; padding: 0; font-size: 14px; }
+.content-html :deep(code) { background: rgba(15, 23, 42, 0.08); padding: 2px 6px; border-radius: 6px; }
 .content-html :deep(pre) { background: #1e1e2e; color: #cdd6f4; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 14px; }
 .content-html :deep(code) { background: rgba(99,110,123,0.12); padding: 2px 6px; border-radius: 4px; font-size: 14px; }
 .content-html :deep(pre code) { background: none; padding: 0; }
+.content-html :deep(pre code.hljs) { display: block; padding: 0; }
 .content-html :deep(blockquote) { border-left: 4px solid var(--primary-color); padding: 8px 16px; margin: 16px 0; background: rgba(64,158,255,0.05); }
 .content-html :deep(img) { max-width: 100%; border-radius: 8px; margin: 12px 0; box-shadow: 0 4px 14px rgba(0,0,0,0.08); transition: all 0.3s ease; }
 .content-html :deep(img):hover { box-shadow: 0 8px 24px rgba(0,0,0,0.15); transform: translateY(-2px); }
@@ -699,6 +1048,7 @@ onMounted(() => { loadArticle(); loadComments() })
 .attachment-panel { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--border-color); display: grid; gap: 8px; }
 .attachment-panel h3 { margin: 0; font-size: 16px; color: var(--text-primary); }
 .attachment-link { color: var(--primary-color); text-decoration: none; }
+.attachment-link { border: none; background: none; text-align: left; cursor: pointer; padding: 0; }
 .attachment-link:hover { text-decoration: underline; }
 
 .action-bar { display: flex; gap: 24px; padding-top: 24px; margin-top: 24px; border-top: 1px solid var(--border-color); }
@@ -716,6 +1066,7 @@ onMounted(() => { loadArticle(); loadComments() })
 .comment-body { flex: 1; }
 .comment-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
 .comment-author { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+.comment-avatar-link, .comment-author-link { cursor: pointer; }
 .comment-time { font-size: 12px; color: #bbb; }
 .comment-text { font-size: 14px; color: var(--text-primary); line-height: 1.6; }
 .comment-actions { margin-top: 4px; }
@@ -725,11 +1076,13 @@ onMounted(() => { loadArticle(); loadComments() })
 .author-card { text-align: center; }
 .author-card .el-avatar { margin-bottom: 12px; }
 .author-name { margin: 0 0 4px; font-size: 18px; color: var(--text-primary); }
+.author-avatar, .author-name { cursor: pointer; }
 .author-bio { margin: 0 0 16px; font-size: 13px; color: var(--primary-color); }
 .author-stats { display: flex; justify-content: space-around; border-top: 1px solid var(--border-color); padding-top: 16px; }
 .stat-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .stat-num { font-size: 16px; font-weight: 700; color: var(--text-primary); }
 .stat-item .el-icon { font-size: 14px; color: var(--text-muted); }
+.author-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
 
 .toc-card { padding: 18px 16px; }
 .toc-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
@@ -751,6 +1104,8 @@ onMounted(() => { loadArticle(); loadComments() })
 .action-list { display: flex; flex-direction: column; gap: 8px; }
 .action-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--text-secondary); transition: all 0.2s; padding: 8px 12px; border-radius: 6px; background: #f5f5f5; }
 .action-item:hover, .action-item.active { color: var(--primary-color); background: rgba(64,158,255,0.1); }
+.admin-action-box { margin-top: 6px; display: grid; gap: 8px; }
+.admin-action-row { display: flex; align-items: center; justify-content: space-between; color: var(--text-secondary); font-size: 13px; }
 
 .loading-state { padding: 60px 0; }
 

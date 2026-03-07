@@ -1,7 +1,8 @@
 <template>
   <div class="search-page">
-    <section class="search-head">
-      <h2>全站搜索</h2>
+    <section class="search-hero">
+      <p class="search-caption">GVB Search</p>
+      <h2>文章检索中心</h2>
       <div class="search-box">
         <el-input
           v-model="keyword"
@@ -16,61 +17,65 @@
       </div>
     </section>
 
-    <section class="filter-panel">
-      <div class="sort-row">
-        <button
-          v-for="item in sortOptions"
-          :key="item.value"
-          type="button"
-          class="sort-btn"
-          :class="{ active: currentSort === item.value }"
-          @click="sortBy(item.value)"
-        >
-          {{ item.label }}
-        </button>
-      </div>
-      <div class="tag-row">
-        <button
-          type="button"
-          class="tag-btn"
-          :class="{ active: !currentTag }"
-          @click="setTag('')"
-        >
-          全部标签
-        </button>
-        <button
-          v-for="tag in tags"
-          :key="tag.id || tag.title"
-          type="button"
-          class="tag-btn"
-          :class="{ active: currentTag === tag.title }"
-          @click="setTag(tag.title)"
-        >
-          {{ tag.title }}
-        </button>
-      </div>
-    </section>
+    <section class="search-shell">
+      <aside class="filter-panel">
+        <h3>排序方式</h3>
+        <div class="sort-row">
+          <button
+            v-for="item in sortOptions"
+            :key="item.value"
+            type="button"
+            class="sort-btn"
+            :class="{ active: currentSort === item.value }"
+            @click="sortBy(item.value)"
+          >
+            {{ item.label }}
+          </button>
+        </div>
+        <h3 class="tag-title">标签筛选</h3>
+        <div class="tag-row">
+          <button
+            type="button"
+            class="tag-btn"
+            :class="{ active: !currentTag }"
+            @click="setTag('')"
+          >
+            全部标签
+          </button>
+          <button
+            v-for="tag in tags"
+            :key="tag.id || tag.title"
+            type="button"
+            class="tag-btn"
+            :class="{ active: currentTag === tag.title }"
+            @click="setTag(tag.title)"
+          >
+            {{ tag.title }}
+          </button>
+        </div>
+      </aside>
 
-    <section class="result-panel" v-loading="loading">
-      <div class="result-head">
-        <strong>搜索结果</strong>
-        <span>共 {{ total }} 条</span>
-      </div>
+      <section class="result-panel" v-loading="loading">
+        <div class="result-head">
+          <strong>搜索结果</strong>
+          <span>共 {{ total }} 条</span>
+        </div>
 
-      <div v-if="results.length" class="result-list">
-        <article v-for="item in results" :key="item.id" class="result-item" @click="goDetail(item.id)">
-          <div class="result-body">
-            <h3>{{ item.title }}</h3>
-            <p>{{ item.abstract || '暂无摘要' }}</p>
-            <div class="meta">
-              <span><el-icon><View /></el-icon>{{ item.look_count || 0 }}</span>
-              <span><el-icon><Clock /></el-icon>{{ formatDate(item.created_at) }}</span>
+        <div v-if="results.length" class="result-list">
+          <article v-for="item in results" :key="item.id" class="result-item" @click="goDetail(item.id)">
+            <div class="result-body">
+              <h3>{{ item.title }}</h3>
+              <p>{{ item.abstract || '暂无摘要' }}</p>
+              <div class="meta">
+                <span><el-icon><View /></el-icon>{{ item.look_count || 0 }}</span>
+                <span><el-icon><Clock /></el-icon>{{ formatDate(item.created_at) }}</span>
+              </div>
             </div>
-          </div>
-          <img v-if="item.banner_url" class="result-thumb" :src="$resolveImg(item.banner_url)" alt="cover" />
-        </article>
-      </div>
-      <el-empty v-else-if="!loading" description="暂无搜索结果" />
+            <img v-if="item.banner_url" class="result-thumb" :src="$resolveImg(item.banner_url)" alt="cover" />
+          </article>
+        </div>
+        <el-empty v-else-if="!loading" description="暂无搜索结果" />
+      </section>
     </section>
 
     <el-pagination
@@ -171,66 +176,98 @@ onMounted(async () => {
 <style scoped>
 .search-page {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
-.search-head {
-  border: 1px solid #dbe7f2;
-  border-radius: 14px;
-  background: #fff;
-  padding: 14px;
+.search-hero {
+  border-radius: 20px;
+  padding: 22px 20px;
+  background:
+    radial-gradient(circle at 86% 18%, rgba(255, 206, 137, 0.45) 0, rgba(255, 206, 137, 0) 34%),
+    linear-gradient(140deg, #f3fbff 0%, #fff8ec 50%, #eef8ff 100%);
+  border: 1px solid #d7e7f7;
 }
 
-.search-head h2 {
+.search-caption {
   margin: 0;
-  font-size: 20px;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #5e7c9a;
+}
+
+.search-hero h2 {
+  margin: 0;
+  font-size: 28px;
   color: #173e64;
+  letter-spacing: 1px;
 }
 
 .search-box {
-  margin-top: 10px;
+  margin-top: 14px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 112px;
   gap: 10px;
 }
 
-.filter-panel,
-.result-panel {
-  border-radius: 14px;
-  background: #fff;
-  border: 1px solid #dbe7f2;
-  padding: 14px;
+.search-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.filter-panel {
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff 0%, #f7fbff 100%);
+  border: 1px solid #dbe8f5;
+  padding: 16px;
+  align-self: start;
+  position: sticky;
+  top: 86px;
+}
+
+.filter-panel h3 {
+  margin: 0 0 10px;
+  color: #123b62;
+  font-size: 14px;
 }
 
 .sort-row,
 .tag-row {
-  display: flex;
+  display: grid;
   gap: 8px;
-  flex-wrap: wrap;
 }
 
-.tag-row {
-  margin-top: 10px;
+.tag-title {
+  margin-top: 14px !important;
 }
 
 .sort-btn,
 .tag-btn {
-  border: 1px solid #dce8f4;
+  border: 1px solid #d9e7f3;
   border-radius: 999px;
-  background: #f7fbff;
+  background: #fff;
   color: #2c5279;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
   cursor: pointer;
+  text-align: left;
 }
 
 .sort-btn.active,
 .tag-btn.active,
 .sort-btn:hover,
 .tag-btn:hover {
-  background: #e9f6ff;
-  border-color: #a8d4ec;
+  background: linear-gradient(120deg, #e8f6ff 0%, #fff4db 100%);
+  border-color: #98cde9;
   color: #0f6f8f;
+}
+
+.result-panel {
+  border-radius: 18px;
+  background: linear-gradient(180deg, #ffffff 0%, #f9fcff 100%);
+  border: 1px solid #dbe8f5;
+  padding: 16px;
 }
 
 .result-head {
@@ -242,31 +279,49 @@ onMounted(async () => {
 
 .result-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .result-item {
   border: 1px solid #dce8f4;
-  border-radius: 12px;
-  padding: 12px;
+  border-radius: 22px;
+  padding: 14px 16px;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: flex-start;
+  background: linear-gradient(145deg, #ffffff 0%, #f7fbff 56%, #fff8ed 100%);
+  position: relative;
+  overflow: hidden;
 }
 
 .result-item:hover {
-  box-shadow: 0 10px 20px rgba(17, 56, 92, 0.1);
+  box-shadow: 0 12px 24px rgba(17, 56, 92, 0.11);
+  transform: translateY(-2px);
+}
+
+.result-item::after {
+  content: '';
+  position: absolute;
+  right: -20px;
+  bottom: -28px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(41, 129, 170, 0.1) 0, rgba(41, 129, 170, 0) 72%);
+  pointer-events: none;
 }
 
 .result-body {
   min-width: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .result-body h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   color: #163a5f;
   line-height: 1.5;
 }
@@ -281,11 +336,13 @@ onMounted(async () => {
 
 .result-thumb {
   width: 120px;
-  height: 78px;
+  height: 80px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 16px;
   border: 1px solid #dfe9f3;
   flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 
 .meta {
@@ -307,6 +364,14 @@ onMounted(async () => {
 }
 
 @media (max-width: 992px) {
+  .search-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-panel {
+    position: static;
+  }
+
   .result-item {
     flex-direction: column;
   }
@@ -320,6 +385,10 @@ onMounted(async () => {
 @media (max-width: 768px) {
   .search-box {
     grid-template-columns: 1fr;
+  }
+
+  .search-hero h2 {
+    font-size: 22px;
   }
 }
 </style>

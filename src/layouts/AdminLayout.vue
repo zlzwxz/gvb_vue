@@ -21,8 +21,9 @@
           <el-menu-item index="/admin/dashboard"><el-icon><DataLine /></el-icon><template #title>仪表盘</template></el-menu-item>
           <el-menu-item index="/admin/articles"><el-icon><Document /></el-icon><template #title>文章管理</template></el-menu-item>
           <el-menu-item index="/admin/article/edit"><el-icon><Edit /></el-icon><template #title>发布文章</template></el-menu-item>
-          <el-menu-item v-if="userStore.isAdmin" index="/admin/article/review"><el-icon><DocumentChecked /></el-icon><template #title>文章审核</template></el-menu-item>
-          <el-menu-item index="/admin/images"><el-icon><Picture /></el-icon><template #title>图片素材</template></el-menu-item>
+          <el-menu-item index="/admin/article/review"><el-icon><DocumentChecked /></el-icon><template #title>文章审核</template></el-menu-item>
+          <el-menu-item index="/admin/article/reports"><el-icon><WarningFilled /></el-icon><template #title>文章举报</template></el-menu-item>
+          <el-menu-item index="/admin/images"><el-icon><Picture /></el-icon><template #title>图片库</template></el-menu-item>
           <el-menu-item index="/admin/messages"><el-icon><Message /></el-icon><template #title>私信管理</template></el-menu-item>
           <el-menu-item index="/admin/collects"><el-icon><CollectionTag /></el-icon><template #title>收藏管理</template></el-menu-item>
 
@@ -35,9 +36,20 @@
             <el-menu-item index="/admin/tags"><el-icon><PriceTag /></el-icon>标签管理</el-menu-item>
             <el-menu-item index="/admin/adverts"><el-icon><Promotion /></el-icon>广告管理</el-menu-item>
             <el-menu-item index="/admin/menus"><el-icon><Menu /></el-icon>导航管理</el-menu-item>
+            <el-menu-item index="/admin/boards"><el-icon><Grid /></el-icon>板块管理</el-menu-item>
+            <el-menu-item index="/admin/socials"><el-icon><User /></el-icon>好友管理</el-menu-item>
+            <el-menu-item index="/admin/announcements"><el-icon><Bell /></el-icon>公告管理</el-menu-item>
             <el-menu-item index="/admin/comments"><el-icon><ChatDotRound /></el-icon>评论管理</el-menu-item>
             <el-menu-item index="/admin/chats"><el-icon><ChatLineSquare /></el-icon>群聊管理</el-menu-item>
             <el-menu-item index="/admin/logs"><el-icon><Tickets /></el-icon>日志审计</el-menu-item>
+            <el-sub-menu index="material-group">
+              <template #title>
+                <el-icon><Files /></el-icon>
+                <span>素材中心</span>
+              </template>
+              <el-menu-item index="/admin/material/articles"><el-icon><DocumentAdd /></el-icon>文章素材</el-menu-item>
+              <el-menu-item index="/admin/material/images"><el-icon><PictureFilled /></el-icon>图片素材</el-menu-item>
+            </el-sub-menu>
             <el-menu-item index="/admin/settings"><el-icon><Setting /></el-icon>系统配置</el-menu-item>
           </el-sub-menu>
         </el-menu>
@@ -95,25 +107,31 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import {
+  Bell,
   ArrowDown,
   ChatDotRound,
   ChatLineSquare,
   CollectionTag,
   DataLine,
   DocumentChecked,
+  DocumentAdd,
   Document,
   Edit,
   Expand,
+  Files,
   Fold,
+  Grid,
   Menu,
   Message,
   Picture,
+  PictureFilled,
   PriceTag,
   Promotion,
   Setting,
   Tickets,
   Tools,
-  User
+  User,
+  WarningFilled
 } from '@element-plus/icons-vue'
 
 const router = useRouter()

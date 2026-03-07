@@ -22,7 +22,15 @@
       <el-table :data="list" stripe v-loading="loading">
         <el-table-column prop="title" label="标题" min-width="320" show-overflow-tooltip />
         <el-table-column prop="user_nick_name" label="作者" width="130" />
+        <el-table-column prop="board_name" label="板块" width="120" />
         <el-table-column prop="created_at" label="发布时间" width="180" />
+        <el-table-column label="重复率" width="110">
+          <template #default="{ row }">
+            <el-tag :type="duplicateTagType(row.duplicate_rate)" effect="plain" size="small">
+              {{ formatDuplicateRate(row.duplicate_rate) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
             <el-tag :type="statusTagType(row.review_status)" size="small" effect="plain">{{ statusText(row.review_status) }}</el-tag>
@@ -56,10 +64,12 @@
 <script setup>
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { apiGetArticleList, apiReviewArticle } from '@/api/article'
 
 const router = useRouter()
+const userStore = useUserStore()
 const list = ref([])
 const total = ref(0)
 const currentPage = ref(1)
@@ -80,6 +90,18 @@ function statusTagType(status) {
   const value = Number(status)
   if (value === 1) return 'warning'
   if (value === 3) return 'danger'
+  return 'success'
+}
+
+function formatDuplicateRate(value) {
+  const num = Number(value || 0)
+  return `${num.toFixed(1)}%`
+}
+
+function duplicateTagType(value) {
+  const num = Number(value || 0)
+  if (num >= 70) return 'danger'
+  if (num >= 40) return 'warning'
   return 'success'
 }
 
@@ -120,7 +142,7 @@ async function fetchList(page = 1) {
     const params = {
       page,
       limit: pageSize,
-      review_scope: 'all'
+      review_scope: userStore.isAdmin ? 'all' : 'review'
     }
     if (reviewStatus.value !== 0) {
       params.review_status = reviewStatus.value

@@ -6,15 +6,19 @@
         <el-form-item label="标题" prop="title">
           <el-input v-model="form.title" placeholder="请输入标题" />
         </el-form-item>
-        <el-form-item label="分类" prop="category">
-          <el-select v-model="form.category" placeholder="请选择分类" filterable allow-create>
-            <el-option v-for="c in categories" :key="c" :label="c" :value="c" />
+        <el-form-item label="板块" prop="board_id">
+          <el-select v-model="form.board_id" placeholder="请选择板块" filterable>
+            <el-option v-for="board in boardOptions" :key="board.id" :label="board.name" :value="board.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="标签" prop="tags">
           <el-select v-model="form.tags" multiple placeholder="请选择标签" filterable allow-create>
             <el-option v-for="t in tagOptions" :key="t" :label="t" :value="t" />
           </el-select>
+        </el-form-item>
+        <el-form-item label="私密">
+          <el-switch v-model="form.is_private" />
+          <el-text type="info" size="small" style="margin-left:8px;">开启后仅作者和管理员可见</el-text>
         </el-form-item>
         <el-form-item label="封面" prop="banner_id">
           <div class="image-picker">
@@ -80,6 +84,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { apiCreateArticle, apiUpdateArticle, apiGetArticleDetail, apiUploadArticleFile } from '@/api/article'
 import { apiGetTagList } from '@/api/tag'
 import { apiUploadImage, apiGetImageList } from '@/api/image'
+import { apiGetBoardList } from '@/api/board'
 import { ElMessage } from 'element-plus'
 import { mavonEditor } from 'mavon-editor'
 import 'mavon-editor/dist/css/index.css'
@@ -93,36 +98,38 @@ const loading = ref(false)
 
 const form = ref({
   title: '',
+  board_id: null,
   category: '',
   tags: [],
   banner_id: null,
   abstract: '',
   content: '',
-  attachments: []
+  attachments: [],
+  is_private: false
 })
 
 const rules = {
   title: [{ required: true, message: '标题不能为空', trigger: 'blur' }],
+  board_id: [{ required: true, message: '请选择板块', trigger: 'change' }],
   content: [{ required: true, message: '内容不能为空', trigger: 'blur' }]
 }
 
-const categories = ref([])
+const boardOptions = ref([])
 const tagOptions = ref([])
 const banners = ref([])
 
 async function loadMeta() {
   try {
-    const [tagRes, bannerRes] = await Promise.all([
+    const [tagRes, bannerRes, boardRes] = await Promise.all([
       apiGetTagList({ limit: 100 }),
-      apiGetImageList({ limit: 50 })
+      apiGetImageList({ limit: 50 }),
+      apiGetBoardList({ page: 1, limit: 100 })
     ])
-    // Both Category and Tag now use the Tags API as per user request
     const tagData = tagRes?.data?.list || tagRes?.data || []
     const allTags = tagData.map(t => typeof t === 'string' ? t : (t.title || t.name || t.tag || '')).filter(t => t)
-    
-    tagOptions.value = allTags
-    categories.value = allTags
 
+    tagOptions.value = allTags
+    boardOptions.value = boardRes?.data?.list || boardRes?.data || []
     banners.value = bannerRes?.data?.list || bannerRes?.data || []
   } catch (e) { console.error('加载元数据失败', e) }
 }
@@ -131,19 +138,41 @@ async function loadArticle(id) {
   const res = await apiGetArticleDetail(id)
   const data = res.data
   form.value.title = data.title
+  form.value.board_id = data.board_id || null
   form.value.category = data.category || ''
   form.value.tags = data.tags || []
   form.value.banner_id = data.banner_id || null
   form.value.abstract = data.abstract || ''
   form.value.content = data.content || ''
   form.value.attachments = Array.isArray(data.attachments) ? data.attachments : []
+  form.value.is_private = Boolean(data.is_private)
+  if (!form.value.board_id && form.value.category) {
+    const matchedBoard = boardOptions.value.find((item) => item.name === form.value.category)
+    if (matchedBoard?.id) {
+      form.value.board_id = Number(matchedBoard.id)
+    }
+  }
+}
+
+function applyBoardPreset() {
+  if (isEdit.value) return
+  const boardId = Number(route.query.board_id || 0)
+  if (!boardId) return
+  const matchedBoard = boardOptions.value.find((item) => Number(item.id) === boardId)
+  if (!matchedBoard) return
+  form.value.board_id = boardId
+  if (!form.value.category) {
+    form.value.category = matchedBoard.name || ''
+  }
 }
 
 onMounted(async () => {
   await loadMeta()
   if (isEdit.value) {
     await loadArticle(route.query.id)
+    return
   }
+  applyBoardPreset()
 })
 
 async function handleEditorImgAdd(pos, file) {

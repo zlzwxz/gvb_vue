@@ -32,6 +32,18 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true
         }
       }
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vue: ['vue', 'vue-router', 'pinia'],
+            element: ['element-plus', '@element-plus/icons-vue'],
+            editor: ['mavon-editor', 'marked', 'dompurify', 'highlight.js'],
+            charts: ['echarts']
+          }
+        }
+      }
     }
   }
 })

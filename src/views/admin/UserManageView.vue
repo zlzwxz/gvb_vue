@@ -246,7 +246,7 @@ function submitCreateUser() {
 function handleDelete(row) {
   ElMessageBox.confirm(`确定删除用户「${row.user_name}」吗？`, '删除确认', { type: 'warning' })
     .then(async () => {
-      await apiDeleteUsers({ user_ids: [row.id] })
+      await apiDeleteUsers({ id_list: [row.id] })
       ElMessage.success('删除成功')
       await fetchList(currentPage.value)
     })
@@ -257,7 +257,7 @@ function handleBatchDelete() {
   const ids = selectedRows.value.map((item) => item.id)
   ElMessageBox.confirm(`确定删除选中的 ${ids.length} 个用户吗？`, '批量删除', { type: 'warning' })
     .then(async () => {
-      await apiDeleteUsers({ user_ids: ids })
+      await apiDeleteUsers({ id_list: ids })
       ElMessage.success('批量删除成功')
       selectedRows.value = []
       await fetchList(currentPage.value)

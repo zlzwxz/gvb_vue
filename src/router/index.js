@@ -1,4 +1,12 @@
-﻿import { createRouter, createWebHistory } from 'vue-router'
+// `src/router/index.js` 负责定义整个前端的页面地图。
+// 你可以把它理解成“地址栏 -> 页面组件”的对应关系表。
+//
+// 一个完整的路由系统通常要回答 4 个问题：
+// 1. 有哪些页面？
+// 2. 某个 URL 应该渲染哪个组件？
+// 3. 进入这个页面前是否需要登录/管理员权限？
+// 4. 页面切换时标题、滚动条、进度条该怎么处理？
+import { createRouter, createWebHistory } from 'vue-router'
 import NProgress from 'nprogress'
 import { useUserStore } from '@/stores/user'
 
@@ -13,6 +21,12 @@ const frontRoutes = [
         name: 'Home',
         component: () => import('@/views/front/HomeView.vue'),
         meta: { title: '首页' }
+      },
+      {
+        path: 'board/:key',
+        name: 'BoardDetail',
+        component: () => import('@/views/front/BoardDetailView.vue'),
+        meta: { title: '板块' }
       },
       {
         path: 'article/:id',
@@ -55,6 +69,12 @@ const frontRoutes = [
         name: 'Profile',
         component: () => import('@/views/front/ProfileView.vue'),
         meta: { title: '个人中心', requiresAuth: true }
+      },
+      {
+        path: 'space/:id',
+        name: 'UserSpace',
+        component: () => import('@/views/front/UserSpaceView.vue'),
+        meta: { title: '用户空间' }
       },
       {
         path: 'collect',
@@ -105,7 +125,13 @@ const adminRoutes = [
         path: 'article/review',
         name: 'ArticleReview',
         component: () => import('@/views/admin/ArticleReviewView.vue'),
-        meta: { title: '文章审核', icon: 'DocumentChecked', requiresAdmin: true }
+        meta: { title: '文章审核', icon: 'DocumentChecked' }
+      },
+      {
+        path: 'article/reports',
+        name: 'ArticleReport',
+        component: () => import('@/views/admin/ArticleReportView.vue'),
+        meta: { title: '文章举报', icon: 'WarningFilled' }
       },
       {
         path: 'tags',
@@ -130,6 +156,24 @@ const adminRoutes = [
         name: 'MenuManage',
         component: () => import('@/views/admin/MenuManageView.vue'),
         meta: { title: '菜单管理', icon: 'Menu', requiresAdmin: true }
+      },
+      {
+        path: 'boards',
+        name: 'BoardManage',
+        component: () => import('@/views/admin/BoardManageView.vue'),
+        meta: { title: '板块管理', icon: 'Grid', requiresAdmin: true }
+      },
+      {
+        path: 'socials',
+        name: 'SocialManage',
+        component: () => import('@/views/admin/SocialManageView.vue'),
+        meta: { title: '好友管理', icon: 'User', requiresAdmin: true }
+      },
+      {
+        path: 'announcements',
+        name: 'AnnouncementManage',
+        component: () => import('@/views/admin/AnnouncementManageView.vue'),
+        meta: { title: '公告管理', icon: 'Bell', requiresAdmin: true }
       },
       {
         path: 'messages',
@@ -166,6 +210,18 @@ const adminRoutes = [
         name: 'SettingManage',
         component: () => import('@/views/admin/SettingManageView.vue'),
         meta: { title: '系统设置', icon: 'Setting', requiresAdmin: true }
+      },
+      {
+        path: 'material/articles',
+        name: 'ArticleMaterial',
+        component: () => import('@/views/admin/ArticleMaterialView.vue'),
+        meta: { title: '文章素材', icon: 'DocumentAdd', requiresAdmin: true }
+      },
+      {
+        path: 'material/images',
+        name: 'ImageMaterial',
+        component: () => import('@/views/admin/ImageMaterialView.vue'),
+        meta: { title: '图片素材', icon: 'PictureFilled', requiresAdmin: true }
       }
     ]
   }
@@ -194,18 +250,25 @@ const standaloneRoutes = [
 ]
 
 const router = createRouter({
+  // 使用浏览器原生 History 模式，因此地址会是 `/login`、`/admin/users` 这种干净路径，
+  // 而不是 `/#/login` 这种 hash 路径。
   history: createWebHistory(),
   routes: [...frontRoutes, ...adminRoutes, ...standaloneRoutes],
   scrollBehavior(to, from, savedPosition) {
+    // 浏览器“前进/后退”时，优先恢复原来的滚动位置。
     if (savedPosition) return savedPosition
+    // 普通跳转时回到页面顶部，避免用户在新页面还停留在旧页面滚动位置。
     return { top: 0 }
   }
 })
 
 // 全局前置守卫：统一做标题设置、用户信息懒加载、登录鉴权、管理员鉴权。
 router.beforeEach(async (to, from, next) => {
+  // 页面一开始切换，就启动顶部进度条。
   NProgress.start()
 
+  // 根据路由元信息设置浏览器标题。
+  // 这里约定：每个页面在 `meta.title` 里声明自己的标题。
   document.title = to.meta.title ? `${to.meta.title} - GVB社区` : 'GVB社区'
 
   const userStore = useUserStore()
@@ -216,19 +279,24 @@ router.beforeEach(async (to, from, next) => {
   }
 
   if (to.meta.requiresAuth && !userStore.isLoggedIn) {
+    // 未登录用户访问受保护页面时，先跳去登录页，
+    // 并把原始目标地址记到 `redirect`，登录成功后可以再跳回来。
     next({ path: '/login', query: { redirect: to.fullPath } })
     return
   }
 
   if (to.meta.requiresAdmin && !userStore.isAdmin) {
+    // 不是管理员时，直接打回首页。
     next({ path: '/' })
     return
   }
 
+  // 以上条件都通过后，放行进入目标页面。
   next()
 })
 
 router.afterEach(() => {
+  // 页面切换结束后，关闭顶部进度条。
   NProgress.done()
 })
 
