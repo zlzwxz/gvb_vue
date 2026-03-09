@@ -42,7 +42,7 @@
               </el-button>
             </div>
             <el-divider />
-            <div class="content-html" v-html="renderedContent"></div>
+            <div class="content-html" v-html="renderedContent" @click="handleContentClick"></div>
             <div v-if="Array.isArray(article.attachments) && article.attachments.length" class="attachment-panel">
               <h3>附件下载</h3>
               <button
@@ -274,7 +274,9 @@ import DOMPurify from 'dompurify'
 import request from '@/utils/request'
 import { normalizeRichTextHtml, resolveResourceUrl } from '@/utils/url'
 import hljs from 'highlight.js'
-import 'highlight.js/styles/github-dark.css'
+import 'highlight.js/styles/github.css'
+
+const copyButtonTimers = new WeakMap()
 
 const route = useRoute()
 const router = useRouter()
@@ -296,7 +298,8 @@ marked.use({
         ? hljs.highlight(source, { language: finalLanguage, ignoreIllegals: true }).value
         : hljs.highlightAuto(source).value
       const languageClass = finalLanguage ? ` language-${finalLanguage}` : ''
-      return `<pre class="article-code-block"><code class="hljs${languageClass}">${highlighted}</code></pre>`
+      const encodedSource = encodeURIComponent(source)
+      return `<div class="article-code-wrapper"><button type="button" class="code-copy-btn" data-code="${encodedSource}">复制</button><pre class="article-code-block"><code class="hljs${languageClass}">${highlighted}</code></pre></div>`
     }
   }
 })
@@ -372,6 +375,99 @@ function renderMarkdownContent(content) {
     ALLOW_UNKNOWN_PROTOCOLS: false
   })
   return normalizeRichTextHtml(sanitized)
+}
+
+async function copyTextToClipboard(text) {
+  if (!text) return false
+
+  if (navigator?.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return true
+    } catch {
+      // fall through
+    }
+  }
+
+  try {
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.setAttribute('readonly', 'readonly')
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.select()
+    const copied = document.execCommand('copy')
+    document.body.removeChild(textarea)
+    return copied
+  } catch {
+    return false
+  }
+}
+
+async function handleContentClick(event) {
+  const button = event?.target?.closest?.('.code-copy-btn')
+  if (button) {
+    event.preventDefault()
+    event.stopPropagation()
+
+    const encodedSource = String(button.getAttribute('data-code') || '')
+    if (!encodedSource) {
+      ElMessage.warning('未获取到代码内容')
+      return
+    }
+
+    let source = ''
+    try {
+      source = decodeURIComponent(encodedSource)
+    } catch {
+      source = encodedSource
+    }
+
+    const copied = await copyTextToClipboard(source)
+    if (!copied) {
+      ElMessage.error('复制失败，请手动复制')
+      return
+    }
+
+    const existingTimer = copyButtonTimers.get(button)
+    if (existingTimer) {
+      clearTimeout(existingTimer)
+    }
+    button.textContent = '已复制'
+    button.classList.add('is-copied')
+    const timer = window.setTimeout(() => {
+      button.textContent = '复制'
+      button.classList.remove('is-copied')
+      copyButtonTimers.delete(button)
+    }, 1600)
+    copyButtonTimers.set(button, timer)
+    return
+  }
+
+  const anchorLink = event?.target?.closest?.('a[href]')
+  if (!anchorLink) return
+
+  const href = String(anchorLink.getAttribute('href') || '').trim()
+  if (!href.startsWith('#')) return
+
+  const targetElement = findHeadingElementByAnchor(href)
+  if (!targetElement) return
+
+  event.preventDefault()
+  event.stopPropagation()
+  scrollToHeading(targetElement)
+  syncRouteHash(targetElement.id)
+}
+
+function decodeHashValue(value) {
+  const raw = String(value || '').trim().replace(/^#/, '')
+  if (!raw) return ''
+  try {
+    return decodeURIComponent(raw).trim()
+  } catch {
+    return raw.trim()
+  }
 }
 
 const renderedContent = computed(() => {
@@ -564,8 +660,6 @@ async function loadArticle() {
     article.value = res.data || res
     syncArticleBreadcrumb()
     await loadArticleTOC()
-    await nextTick()
-    syncTocWithContent()
   } catch (e) {
     // 检查是否是 token过期（code: 7）
     if (e?.response?.data?.code === 7) {
@@ -576,6 +670,10 @@ async function loadArticle() {
     ElMessage.error('文章加载失败，请稍后重试')
   } finally {
     loading.value = false
+    await nextTick()
+    syncTocWithContent()
+    await nextTick()
+    scrollToRouteHash()
   }
 }
 
@@ -736,19 +834,39 @@ function normalizeTitle(title) {
     .toLowerCase()
 }
 
+function normalizeAnchorText(value) {
+  return String(value || '')
+    .replace(/&nbsp;/gi, ' ')
+    .trim()
+    .replace(/^\s*#+\s*/, '')
+    .replace(/\s+/g, '')
+}
+
+function buildHeadingAnchorId(title, index) {
+  const base = normalizeAnchorText(title)
+    .replace(/[<>"]/g, '')
+  return base || `article-heading-${index + 1}`
+}
+
 function getContentHeadings() {
   const contentEl = document.querySelector('.content-html')
   if (!contentEl) return []
 
   const headingElements = Array.from(contentEl.querySelectorAll('h1, h2, h3, h4, h5, h6'))
     .filter((heading) => heading.textContent?.trim())
+  const idCounter = new Map()
 
   return headingElements.map((heading, index) => {
     const title = heading.textContent.trim()
-    const anchorId = `article-heading-${index}`
+    const baseAnchorId = buildHeadingAnchorId(title, index)
+    const nextCount = (idCounter.get(baseAnchorId) || 0) + 1
+    idCounter.set(baseAnchorId, nextCount)
+    const anchorId = nextCount > 1 ? `${baseAnchorId}-${nextCount}` : baseAnchorId
     heading.id = anchorId
+    heading.dataset.anchorBase = baseAnchorId
     return {
       anchorId,
+      anchorBase: baseAnchorId,
       title,
       normalizedTitle: normalizeTitle(title),
       level: Number(heading.tagName.slice(1))
@@ -836,7 +954,7 @@ function syncTocWithContent() {
 
     return {
       ...item,
-      title: title || slugAnchor || matchedHeading?.title || '未命名标题',
+      title: matchedHeading?.title || title || slugAnchor || '未命名标题',
       level: matchedHeading?.level || expectedLevel,
       anchorId: matchedHeading?.anchorId || ''
     }
@@ -854,7 +972,44 @@ function scrollToHeading(targetElement) {
   }, 1200)
 }
 
-function scrollToSection(item) {
+function syncRouteHash(anchorId) {
+  const nextHash = anchorId ? `#${encodeURIComponent(anchorId)}` : ''
+  if (route.hash === nextHash) return
+  router.replace({
+    name: 'ArticleDetail',
+    params: { id: String(route.params.id) },
+    query: route.query,
+    hash: nextHash
+  }).catch(() => {})
+}
+
+function findHeadingElementByAnchor(anchorValue) {
+  const decodedAnchor = decodeHashValue(anchorValue)
+  if (!decodedAnchor) return null
+
+  const directTarget = document.getElementById(decodedAnchor)
+  if (directTarget) return directTarget
+
+  const normalizedAnchor = normalizeAnchorText(decodedAnchor)
+  const normalizedTitleAnchor = normalizeTitle(decodedAnchor)
+  const headingMeta = getContentHeadings()
+  const matchedHeading = headingMeta.find((heading) => (
+    heading.anchorBase === normalizedAnchor
+      || heading.anchorId === normalizedAnchor
+      || heading.normalizedTitle === normalizedTitleAnchor
+  ))
+
+  return matchedHeading?.anchorId ? document.getElementById(matchedHeading.anchorId) : null
+}
+
+function scrollToRouteHash() {
+  const targetElement = findHeadingElementByAnchor(route.hash)
+  if (!targetElement) return false
+  scrollToHeading(targetElement)
+  return true
+}
+
+function scrollToSection(item, options = {}) {
   let targetElement = item?.anchorId ? document.getElementById(item.anchorId) : null
 
   if (!targetElement) {
@@ -874,6 +1029,9 @@ function scrollToSection(item) {
 
   if (targetElement) {
     scrollToHeading(targetElement)
+    if (options.updateHash !== false) {
+      syncRouteHash(targetElement.id)
+    }
   }
 }
 
@@ -1019,6 +1177,14 @@ onMounted(() => { loadArticle(); loadComments() })
 watch(renderedContent, async () => {
   await nextTick()
   syncTocWithContent()
+  await nextTick()
+  scrollToRouteHash()
+}, { flush: 'post' })
+
+watch(() => route.hash, async (value, oldValue) => {
+  if (value === oldValue) return
+  await nextTick()
+  scrollToRouteHash()
 }, { flush: 'post' })
 
 watch(() => route.params.id, async (value, oldValue) => {
@@ -1070,13 +1236,14 @@ watch(() => route.params.id, async (value, oldValue) => {
 .content-html :deep(h1), .content-html :deep(h2), .content-html :deep(h3), .content-html :deep(h4), .content-html :deep(h5), .content-html :deep(h6) { margin-top: 28px; margin-bottom: 14px; font-weight: 600; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; }
 .content-html :deep(h4), .content-html :deep(h5), .content-html :deep(h6) { border-bottom: none; margin-top: 20px; padding-bottom: 0; }
 .content-html :deep(.toc-highlight) { background: rgba(64,158,255,0.14); border-radius: 6px; transition: background 0.3s ease; }
-.content-html :deep(pre) { background: #0f172a; border-radius: 12px; padding: 16px; overflow-x: auto; margin: 18px 0; }
-.content-html :deep(pre code) { background: transparent; padding: 0; font-size: 14px; }
-.content-html :deep(code) { background: rgba(15, 23, 42, 0.08); padding: 2px 6px; border-radius: 6px; }
-.content-html :deep(pre) { background: #1e1e2e; color: #cdd6f4; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 14px; }
-.content-html :deep(code) { background: rgba(99,110,123,0.12); padding: 2px 6px; border-radius: 4px; font-size: 14px; }
-.content-html :deep(pre code) { background: none; padding: 0; }
-.content-html :deep(pre code.hljs) { display: block; padding: 0; }
+.content-html :deep(.article-code-wrapper) { position: relative; margin: 18px 0; }
+.content-html :deep(.code-copy-btn) { position: absolute; top: 10px; right: 10px; z-index: 2; border: 1px solid #d0d7de; background: rgba(255,255,255,0.94); color: #44536a; border-radius: 8px; padding: 4px 10px; font-size: 12px; line-height: 1.2; cursor: pointer; opacity: 0; transform: translateY(-2px); transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease, color 0.18s ease; }
+.content-html :deep(.article-code-wrapper:hover .code-copy-btn) { opacity: 1; transform: translateY(0); }
+.content-html :deep(.code-copy-btn.is-copied) { background: #e6f6ec; color: #196c3b; border-color: #b7e1c4; opacity: 1; }
+.content-html :deep(pre) { background: #f6f8fa; color: #24292f; border: 1px solid #d0d7de; border-radius: 12px; padding: 16px; overflow-x: auto; margin: 0; font-size: 14px; }
+.content-html :deep(code) { background: #f1f3f5; color: #24292f; padding: 2px 6px; border-radius: 6px; font-size: 14px; }
+.content-html :deep(pre code),
+.content-html :deep(pre code.hljs) { background: transparent; color: inherit; padding: 0; display: block; }
 .content-html :deep(blockquote) { border-left: 4px solid var(--primary-color); padding: 8px 16px; margin: 16px 0; background: rgba(64,158,255,0.05); }
 .content-html :deep(img) { max-width: 100%; border-radius: 8px; margin: 12px 0; box-shadow: 0 4px 14px rgba(0,0,0,0.08); transition: all 0.3s ease; }
 .content-html :deep(img):hover { box-shadow: 0 8px 24px rgba(0,0,0,0.15); transform: translateY(-2px); }

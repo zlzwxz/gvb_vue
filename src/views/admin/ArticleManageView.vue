@@ -53,7 +53,9 @@
         </el-table-column>
         <el-table-column prop="title" label="标题" min-width="280" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-button type="primary" link @click="goEdit(row.id)">{{ row.title }}</el-button>
+            <el-button type="primary" link @click="goEdit(row.id)">
+              <span v-html="renderTitle(row)"></span>
+            </el-button>
           </template>
         </el-table-column>
         <el-table-column prop="board_name" label="板块" width="140">
@@ -121,13 +123,14 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { apiDeleteArticle, apiGetArticleList } from '@/api/article'
 import { apiGetBoardList } from '@/api/board'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import { renderHighlightedHtml } from '@/utils/search'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -141,6 +144,8 @@ const sort = ref('created_at desc')
 const reviewStatus = ref(0)
 const boardFilter = ref(0)
 const boardOptions = ref([])
+let searchTimer = 0
+let latestRequestId = 0
 
 function goCreate() {
   router.push({ name: 'ArticleEdit' })
@@ -152,6 +157,10 @@ function goEdit(id) {
 
 function goReview() {
   router.push({ name: 'ArticleReview' })
+}
+
+function renderTitle(row) {
+  return renderHighlightedHtml(row?.title || '未命名文章', search.value)
 }
 
 function statusText(status) {
@@ -188,6 +197,7 @@ function formatDate(dateStr) {
 }
 
 async function fetchList(page = 1) {
+  const requestId = ++latestRequestId
   currentPage.value = page
   loading.value = true
   try {
@@ -212,6 +222,7 @@ async function fetchList(page = 1) {
     }
 
     const res = await apiGetArticleList(params)
+    if (requestId !== latestRequestId) return
     const data = res.data || {}
     const rawList = data.list || (Array.isArray(data) ? data : [])
     if (userStore.isAdmin) {
@@ -229,7 +240,9 @@ async function fetchList(page = 1) {
   } catch (e) {
     ElMessage.error('获取文章列表失败')
   } finally {
-    loading.value = false
+    if (requestId === latestRequestId) {
+      loading.value = false
+    }
   }
 }
 
@@ -251,6 +264,18 @@ onMounted(() => {
     boardOptions.value = []
   })
   fetchList(1)
+})
+
+watch(search, (value, oldValue) => {
+  if (value === oldValue) return
+  window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
+    fetchList(1)
+  }, 280)
+})
+
+onBeforeUnmount(() => {
+  window.clearTimeout(searchTimer)
 })
 </script>
 
@@ -291,6 +316,13 @@ onMounted(() => {
 .author-id {
   font-size: 12px;
   color: #909399;
+}
+
+.article-manage-page :deep(mark) {
+  background: rgba(255, 188, 80, 0.34);
+  color: #8b3d00;
+  padding: 0 4px;
+  border-radius: 4px;
 }
 
 @media (max-width: 768px) {

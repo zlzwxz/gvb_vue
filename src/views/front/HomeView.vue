@@ -292,8 +292,8 @@
                 <img :src="$resolveImg(resolveBanner(item))" :alt="item.title" />
               </div>
 
-              <h4 class="thread-title">{{ item.title }}</h4>
-              <p class="thread-abstract">{{ item.abstract || '这个主题还没有摘要，点击进入查看完整内容。' }}</p>
+              <h4 class="thread-title" v-html="renderArticleTitle(item)"></h4>
+              <p class="thread-abstract" v-html="renderArticleSummary(item)"></p>
 
               <footer class="thread-footer">
                 <div class="thread-stats">
@@ -439,7 +439,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
@@ -450,6 +450,7 @@ import { apiGetAdvertList } from '@/api/advert'
 import { apiGetBoardList } from '@/api/board'
 import { apiGetPublicSiteInfo, apiUpdateSetting } from '@/api/system'
 import { apiGetUserLevelRank } from '@/api/user'
+import { renderHighlightedHtml, renderSnippetHtml } from '@/utils/search'
 import {
   ArrowRightBold,
   ChatDotRound,
@@ -656,6 +657,15 @@ function resolveTags(item) {
   return []
 }
 
+function renderArticleTitle(item) {
+  return renderHighlightedHtml(item?.title || '未命名主题', searchKey.value)
+}
+
+function renderArticleSummary(item) {
+  const source = item?.abstract || '这个主题还没有摘要，点击进入查看完整内容。'
+  return renderSnippetHtml(source, searchKey.value, 88)
+}
+
 function isHot(item) {
   return hotIdSet.value.has(String(item.id))
 }
@@ -755,6 +765,7 @@ function countBoardManagers(board, field) {
 }
 
 async function fetchArticles(page = 1) {
+  const requestId = ++fetchArticles.latestRequestId
   currentPage.value = page
   loadingArticles.value = true
   try {
@@ -776,12 +787,16 @@ async function fetchArticles(page = 1) {
     }
 
     const res = await apiGetArticleList(params)
+    if (requestId !== fetchArticles.latestRequestId) return
     articles.value = res.data?.list || []
     total.value = Number(res.data?.count || res.data?.total || 0)
   } finally {
-    loadingArticles.value = false
+    if (requestId === fetchArticles.latestRequestId) {
+      loadingArticles.value = false
+    }
   }
 }
+fetchArticles.latestRequestId = 0
 
 async function fetchInsights() {
   const hotSize = Math.max(10, homeLayout.hotCount)
@@ -920,6 +935,20 @@ onMounted(async () => {
 
 watch(recommendSort, () => {
   fetchTopViewedArticles()
+})
+
+let searchTimer = 0
+
+watch(searchKey, (value, oldValue) => {
+  if (value === oldValue) return
+  window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
+    fetchArticles(1)
+  }, 280)
+})
+
+onBeforeUnmount(() => {
+  window.clearTimeout(searchTimer)
 })
 </script>
 
@@ -1389,6 +1418,13 @@ watch(recommendSort, () => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+.thread-card :deep(mark) {
+  background: rgba(255, 193, 94, 0.38);
+  color: #7d3b00;
+  padding: 0 4px;
+  border-radius: 4px;
 }
 
 .thread-footer {

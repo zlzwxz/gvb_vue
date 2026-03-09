@@ -1,11 +1,14 @@
 <template>
-  <div v-if="userStore.isLoggedIn" class="friend-float-wrap">
+  <div
+    v-if="userStore.isLoggedIn"
+    class="friend-float-wrap"
+    @mouseenter="openHover"
+    @mouseleave="closeHover"
+  >
     <button
       class="friend-launcher"
       type="button"
       @click="toggleExpanded"
-      @mouseenter="openHover"
-      @mouseleave="closeHover"
     >
       <div class="launcher-badge">{{ socialStore.summary.online_friend_count || 0 }}</div>
       <div class="launcher-copy">
@@ -19,8 +22,6 @@
       <section
         v-if="expanded"
         class="friend-card"
-        @mouseenter="openHover"
-        @mouseleave="closeHover"
       >
         <header class="card-header">
           <div>
@@ -60,7 +61,7 @@
 
           <div v-if="showPresenceEditor" class="presence-editor">
             <div class="presence-editor-row">
-              <el-select v-model="presenceForm.mode" size="small">
+              <el-select v-model="presenceForm.mode" size="small" :teleported="false">
                 <el-option v-for="item in presenceOptions" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
               <el-switch
@@ -299,6 +300,7 @@ function openHover() {
 
 function closeHover() {
   if (!hoverCapable.value) return
+  if (showPresenceEditor.value || saving.value) return
   clearHoverTimer()
   closeTimer.value = window.setTimeout(() => {
     expanded.value = false
@@ -498,12 +500,12 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.friend-float-wrap{position:fixed;right:18px;top:88px;z-index:240}
+.friend-float-wrap{position:fixed;right:18px;top:88px;z-index:240;width:88px;padding-bottom:12px;display:flex;justify-content:flex-end;overflow:visible}
 .friend-launcher,.friend-card,.presence-panel,.friend-section,.friend-group,.friend-row,.group-head{box-shadow:0 18px 40px rgba(15,23,42,.12)}
-.friend-launcher{width:88px;min-height:128px;border:none;border-radius:24px;background:linear-gradient(180deg,rgba(56,189,248,.96),rgba(14,116,144,.96));color:#fff;display:grid;gap:10px;justify-items:center;align-content:center;padding:14px 10px;cursor:pointer}
+.friend-launcher{position:relative;z-index:2;width:88px;min-height:128px;border:none;border-radius:24px;background:linear-gradient(180deg,rgba(56,189,248,.96),rgba(14,116,144,.96));color:#fff;display:grid;gap:10px;justify-items:center;align-content:center;padding:14px 10px;cursor:pointer}
 .launcher-badge{width:38px;height:38px;border-radius:14px;background:rgba(255,255,255,.18);display:grid;place-items:center;font-size:22px;font-weight:800}
 .launcher-copy{text-align:center}.launcher-copy strong,.launcher-copy span,.launcher-copy small{display:block}.launcher-copy span{margin-top:6px;font-size:12px}.launcher-copy small{margin-top:4px;opacity:.86;line-height:1.4}
-.friend-card{margin-top:12px;width:376px;max-height:min(80vh,860px);overflow:hidden;border-radius:24px;background:linear-gradient(180deg,rgba(247,251,255,.98),rgba(255,255,255,.98));border:1px solid rgba(148,163,184,.22);padding:16px;display:grid;gap:12px}
+.friend-card{position:absolute;right:0;top:calc(100% - 4px);z-index:1;width:376px;max-height:min(80vh,860px);overflow:hidden;border-radius:24px;background:linear-gradient(180deg,rgba(247,251,255,.98),rgba(255,255,255,.98));border:1px solid rgba(148,163,184,.22);padding:16px;display:grid;gap:12px}
 .card-header,.presence-top,.presence-user,.presence-name,.header-actions,.section-head,.friend-main-top,.friend-state-line,.friend-row,.friend-actions,.group-head,.pager-row{display:flex;align-items:center}
 .card-header,.presence-top,.section-head,.friend-main-top,.friend-row,.group-head,.pager-row{justify-content:space-between;gap:12px}
 .card-header strong,.presence-copy strong,.friend-main strong,.group-head strong{color:#0f172a}.card-header span,.presence-copy span,.presence-copy small,.section-head span,.friend-main span,.friend-main small,.group-head span,.pager-row span{color:#64748b;font-size:12px}
@@ -521,7 +523,7 @@ onBeforeUnmount(() => {
 .friend-state-line{gap:8px}.friend-actions{gap:6px;opacity:0;transition:opacity .18s}.friend-row:hover .friend-actions,.friend-row:focus-within .friend-actions{opacity:1}
 .action-btn,.pager-btn{border:none;border-radius:10px;cursor:pointer}.action-btn{width:28px;height:28px;background:#eef4fb;color:#547392;display:grid;place-items:center}.action-btn:disabled{opacity:.42;cursor:not-allowed}.pager-row{padding:6px 4px 2px}.pager-btn{background:#ecf4fb;color:#28557e;padding:5px 10px;font-size:12px}.pager-btn:disabled{opacity:.45;cursor:not-allowed}
 .call-box{display:grid;justify-items:center;gap:12px;padding:12px 0}.call-duration{color:#0f766e;font-weight:700}
-.float-card-enter-active,.float-card-leave-active{transition:all .2s ease}.float-card-enter-from,.float-card-leave-to{opacity:0;transform:translateY(-8px) scale(.98)}
+.float-card-enter-active,.float-card-leave-active{transition:all .18s ease}.float-card-enter-from,.float-card-leave-to{opacity:0;transform:translateY(-6px) scale(.985)}
 @media (max-width:960px){.friend-float-wrap{right:12px;top:auto;bottom:84px}.friend-card{width:min(94vw,376px)}.friend-actions{opacity:1}}
 @media (max-width:640px){.card-header,.presence-top,.friend-row,.pager-row{flex-direction:column;align-items:flex-start}.presence-editor-row{grid-template-columns:1fr}}
 </style>

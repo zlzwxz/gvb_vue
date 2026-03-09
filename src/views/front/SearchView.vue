@@ -6,7 +6,7 @@
       <div class="search-box">
         <el-input
           v-model="keyword"
-          placeholder="输入关键词并回车"
+          placeholder="输入关键词实时搜索"
           clearable
           @keyup.enter="doSearch(1)"
           @clear="doSearch(1)"
@@ -64,8 +64,8 @@
         <div v-if="results.length" class="result-list">
           <article v-for="item in results" :key="item.id" class="result-item" @click="goDetail(item.id)">
             <div class="result-body">
-              <h3>{{ item.title }}</h3>
-              <p>{{ item.abstract || '暂无摘要' }}</p>
+              <h3 v-html="renderResultTitle(item)"></h3>
+              <p v-html="renderResultSummary(item)"></p>
               <div class="meta">
                 <span><el-icon><View /></el-icon>{{ item.look_count || 0 }}</span>
                 <span><el-icon><Clock /></el-icon>{{ formatDate(item.created_at) }}</span>
@@ -92,24 +92,27 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { apiGetArticleList } from '@/api/article'
 import { apiGetTagList } from '@/api/tag'
 import { Clock, Search, View } from '@element-plus/icons-vue'
+import { renderHighlightedHtml, renderSnippetHtml } from '@/utils/search'
 
 const route = useRoute()
 const router = useRouter()
 
 const keyword = ref(String(route.query.key || ''))
-const currentTag = ref('')
-const currentSort = ref('created_at desc')
-const currentPage = ref(1)
+const currentTag = ref(String(route.query.tag || ''))
+const currentSort = ref(String(route.query.sort || 'created_at desc'))
+const currentPage = ref(Math.max(1, Number(route.query.page || 1) || 1))
 const results = ref([])
 const total = ref(0)
 const loading = ref(false)
 const pageSize = 12
 const tags = ref([])
+let searchTimer = 0
+let latestRequestId = 0
 
 const sortOptions = [
   { label: '最新发布', value: 'created_at desc' },
@@ -130,6 +133,41 @@ function goDetail(id) {
   router.push({ name: 'ArticleDetail', params: { id } })
 }
 
+function renderResultTitle(item) {
+  return renderHighlightedHtml(item?.title || '未命名文章', keyword.value)
+}
+
+function renderResultSummary(item) {
+  const source = item?.abstract || item?.content || '暂无摘要'
+  return renderSnippetHtml(source, keyword.value, 92)
+}
+
+function syncSearchRoute(page) {
+  const nextQuery = { ...route.query }
+  const nextKeyword = keyword.value.trim()
+  const nextTag = currentTag.value.trim()
+  const nextSort = currentSort.value.trim()
+  const nextPage = Math.max(1, Number(page || 1) || 1)
+
+  if (nextKeyword) nextQuery.key = nextKeyword
+  else delete nextQuery.key
+
+  if (nextTag) nextQuery.tag = nextTag
+  else delete nextQuery.tag
+
+  if (nextSort && nextSort !== sortOptions[0].value) nextQuery.sort = nextSort
+  else delete nextQuery.sort
+
+  if (nextPage > 1) nextQuery.page = String(nextPage)
+  else delete nextQuery.page
+
+  const currentQuery = JSON.stringify(route.query)
+  const pendingQuery = JSON.stringify(nextQuery)
+  if (currentQuery === pendingQuery) return
+
+  router.replace({ name: 'Search', query: nextQuery }).catch(() => {})
+}
+
 function sortBy(value) {
   currentSort.value = value
   doSearch(1)
@@ -141,7 +179,9 @@ function setTag(value) {
 }
 
 async function doSearch(page = 1) {
+  const requestId = ++latestRequestId
   currentPage.value = page
+  syncSearchRoute(page)
   loading.value = true
   try {
     const params = {
@@ -154,11 +194,14 @@ async function doSearch(page = 1) {
     if (currentTag.value) params.tag = currentTag.value
 
     const res = await apiGetArticleList(params)
+    if (requestId !== latestRequestId) return
     const data = res.data || {}
     results.value = data.list || (Array.isArray(data) ? data : [])
     total.value = Number(data.total || data.count || 0)
   } finally {
-    loading.value = false
+    if (requestId === latestRequestId) {
+      loading.value = false
+    }
   }
 }
 
@@ -168,8 +211,23 @@ async function loadTags() {
   tags.value = data.list || (Array.isArray(data) ? data : [])
 }
 
+function queueSearch(page = 1) {
+  window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
+    doSearch(page)
+  }, 280)
+}
+
 onMounted(async () => {
-  await Promise.all([loadTags(), doSearch(1)])
+  await Promise.all([loadTags(), doSearch(currentPage.value)])
+})
+
+watch(keyword, () => {
+  queueSearch(1)
+})
+
+onBeforeUnmount(() => {
+  window.clearTimeout(searchTimer)
 })
 </script>
 
@@ -332,6 +390,13 @@ onMounted(async () => {
   font-size: 12px;
   color: #607791;
   line-height: 1.7;
+}
+
+.result-body :deep(mark) {
+  background: rgba(255, 188, 80, 0.35);
+  color: #8b3d00;
+  padding: 0 4px;
+  border-radius: 4px;
 }
 
 .result-thumb {

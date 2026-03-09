@@ -287,6 +287,11 @@ const router = createRouter({
   scrollBehavior(to, from, savedPosition) {
     // 浏览器“前进/后退”时，优先恢复原来的滚动位置。
     if (savedPosition) return savedPosition
+    // 同一页面内只更新 hash（例如文章目录跳转）时，不要再触发全局“回顶部”，
+    // 具体滚动由页面内自己的锚点逻辑处理。
+    if (to.path === from.path && to.hash && to.hash !== from.hash) {
+      return false
+    }
     // 普通跳转时回到页面顶部，避免用户在新页面还停留在旧页面滚动位置。
     return { top: 0 }
   }
