@@ -141,7 +141,7 @@
           <el-icon><RefreshRight /></el-icon>
           刷新
         </el-button>
-        <el-button @click="settingVisible = true">
+        <el-button v-if="userStore.isAdmin" @click="settingVisible = true">
           <el-icon><Setting /></el-icon>
           布局设置
         </el-button>
@@ -176,9 +176,17 @@
               <el-icon><Plus /></el-icon>
               <span>发布新主题</span>
             </button>
+            <button type="button" class="quick-btn" @click="goCommunity">
+              <el-icon><ChatDotRound /></el-icon>
+              <span>进入闲聊广场</span>
+            </button>
             <button type="button" class="quick-btn" @click="goChatRoom">
               <el-icon><ChatLineRound /></el-icon>
               <span>加入实时聊天</span>
+            </button>
+            <button type="button" class="quick-btn" @click="goBounty">
+              <el-icon><Star /></el-icon>
+              <span>查看赏金大厅</span>
             </button>
             <button type="button" class="quick-btn" @click="goCollect">
               <el-icon><CollectionTag /></el-icon>
@@ -387,7 +395,12 @@
       </el-col>
     </el-row>
 
-    <el-dialog v-model="settingVisible" title="首页布局设置" width="540px">
+    <el-dialog
+      v-model="settingVisible"
+      title="首页布局设置"
+      width="540px"
+      @closed="syncLayoutFromSiteInfo(siteInfo)"
+    >
       <el-form label-width="140px">
         <el-form-item label="每页文章数量">
           <el-input-number v-model="homeLayout.pageSize" :min="4" :max="12" />
@@ -418,8 +431,8 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="resetHomeLayout">恢复默认</el-button>
-        <el-button type="primary" @click="applyHomeLayout">应用</el-button>
+        <el-button :disabled="layoutSaving" @click="resetHomeLayout">恢复默认</el-button>
+        <el-button type="primary" :loading="layoutSaving" @click="applyHomeLayout">应用</el-button>
       </template>
     </el-dialog>
   </div>
@@ -428,13 +441,14 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/stores/user'
 import { apiGetArticleList, apiGetArticleInsights } from '@/api/article'
 import { apiGetAnnouncementList } from '@/api/announcement'
 import { apiGetTagList } from '@/api/tag'
 import { apiGetAdvertList } from '@/api/advert'
 import { apiGetBoardList } from '@/api/board'
-import { apiGetPublicSiteInfo } from '@/api/system'
+import { apiGetPublicSiteInfo, apiUpdateSetting } from '@/api/system'
 import { apiGetUserLevelRank } from '@/api/user'
 import {
   ArrowRightBold,
@@ -453,7 +467,6 @@ import {
 const router = useRouter()
 const userStore = useUserStore()
 
-const HOME_LAYOUT_STORAGE_KEY = 'gvb_home_layout_v2'
 const defaultHomeLayout = Object.freeze({
   pageSize: 6,
   hotCount: 5,
@@ -482,21 +495,43 @@ function toNumber(value, fallback, min, max) {
   return Math.min(Math.max(Math.round(num), min), max)
 }
 
-function loadHomeLayoutFromStorage() {
-  const layout = buildDefaultLayout()
-  try {
-    const raw = localStorage.getItem(HOME_LAYOUT_STORAGE_KEY)
-    if (!raw) return layout
-    const parsed = JSON.parse(raw)
-    layout.pageSize = toNumber(parsed?.pageSize, layout.pageSize, 4, 12)
-    layout.hotCount = toNumber(parsed?.hotCount, layout.hotCount, 1, 10)
-    layout.levelCount = toNumber(parsed?.levelCount, layout.levelCount, 1, 10)
-    layout.advertCount = toNumber(parsed?.advertCount, layout.advertCount, 1, 8)
-    layout.orders.hot = toNumber(parsed?.orders?.hot, layout.orders.hot, 1, 3)
-    layout.orders.level = toNumber(parsed?.orders?.level, layout.orders.level, 1, 3)
-    layout.orders.profile = toNumber(parsed?.orders?.profile, layout.orders.profile, 1, 3)
-  } catch {}
-  return layout
+function buildLayoutPayload(source = homeLayout) {
+  return {
+    page_size: toNumber(source.pageSize, defaultHomeLayout.pageSize, 4, 12),
+    hot_count: toNumber(source.hotCount, defaultHomeLayout.hotCount, 1, 10),
+    level_count: toNumber(source.levelCount, defaultHomeLayout.levelCount, 1, 10),
+    advert_count: toNumber(source.advertCount, defaultHomeLayout.advertCount, 1, 8),
+    orders: {
+      hot: toNumber(source.orders?.hot, defaultHomeLayout.orders.hot, 1, 3),
+      level: toNumber(source.orders?.level, defaultHomeLayout.orders.level, 1, 3),
+      profile: toNumber(source.orders?.profile, defaultHomeLayout.orders.profile, 1, 3)
+    }
+  }
+}
+
+function applyHomeLayoutState(source) {
+  const payload = buildLayoutPayload({
+    pageSize: source?.page_size ?? source?.pageSize,
+    hotCount: source?.hot_count ?? source?.hotCount,
+    levelCount: source?.level_count ?? source?.levelCount,
+    advertCount: source?.advert_count ?? source?.advertCount,
+    orders: {
+      hot: source?.orders?.hot,
+      level: source?.orders?.level,
+      profile: source?.orders?.profile
+    }
+  })
+  homeLayout.pageSize = payload.page_size
+  homeLayout.hotCount = payload.hot_count
+  homeLayout.levelCount = payload.level_count
+  homeLayout.advertCount = payload.advert_count
+  homeLayout.orders.hot = payload.orders.hot
+  homeLayout.orders.level = payload.orders.level
+  homeLayout.orders.profile = payload.orders.profile
+}
+
+function syncLayoutFromSiteInfo(data) {
+  applyHomeLayoutState(data?.home_layout || buildDefaultLayout())
 }
 
 const articles = ref([])
@@ -505,9 +540,10 @@ const currentPage = ref(1)
 const loadingArticles = ref(false)
 const expandTags = ref(false)
 const settingVisible = ref(false)
+const layoutSaving = ref(false)
 const topViewedArticles = ref([])
 const announcements = ref([])
-const homeLayout = reactive(loadHomeLayoutFromStorage())
+const homeLayout = reactive(buildDefaultLayout())
 
 const feedMode = ref('recommend')
 const recommendSort = ref('digg_count desc')
@@ -676,6 +712,14 @@ function goChatRoom() {
   router.push({ name: 'ChatRoom' })
 }
 
+function goCommunity() {
+  router.push({ name: 'CommunityHub' })
+}
+
+function goBounty() {
+  router.push({ name: 'BountyHub' })
+}
+
 function goCollect() {
   if (!userStore.isLoggedIn) {
     router.push({ path: '/login', query: { redirect: '/collect' } })
@@ -781,6 +825,7 @@ async function fetchSideData() {
   adverts.value = (advRes.data?.list || advRes.data || []).filter((item) => item.is_show)
   boards.value = (boardRes.data?.list || boardRes.data || []).sort((a, b) => Number(a.sort || 0) - Number(b.sort || 0))
   siteInfo.value = siteRes.data || {}
+  syncLayoutFromSiteInfo(siteInfo.value)
 }
 
 async function fetchUserLevelRanking() {
@@ -792,45 +837,46 @@ async function fetchUserLevelRanking() {
   }
 }
 
-function refreshAll() {
+async function refreshAll() {
   expandTags.value = false
-  Promise.all([
-    fetchAnnouncements(),
-    fetchInsights(),
-    fetchTopViewedArticles(),
-    fetchArticles(currentPage.value),
-    fetchSideData(),
-    fetchUserLevelRanking()
-  ]).catch(() => {})
+  try {
+    await fetchSideData()
+    await Promise.all([
+      fetchAnnouncements(),
+      fetchInsights(),
+      fetchTopViewedArticles(),
+      fetchArticles(currentPage.value),
+      fetchUserLevelRanking()
+    ])
+  } catch {}
 }
 
-function saveHomeLayout() {
-  const payload = {
-    pageSize: toNumber(homeLayout.pageSize, defaultHomeLayout.pageSize, 4, 12),
-    hotCount: toNumber(homeLayout.hotCount, defaultHomeLayout.hotCount, 1, 10),
-    levelCount: toNumber(homeLayout.levelCount, defaultHomeLayout.levelCount, 1, 10),
-    advertCount: toNumber(homeLayout.advertCount, defaultHomeLayout.advertCount, 1, 8),
-    orders: {
-      hot: toNumber(homeLayout.orders.hot, defaultHomeLayout.orders.hot, 1, 3),
-      level: toNumber(homeLayout.orders.level, defaultHomeLayout.orders.level, 1, 3),
-      profile: toNumber(homeLayout.orders.profile, defaultHomeLayout.orders.profile, 1, 3)
-    }
+async function applyHomeLayout() {
+  if (!userStore.isAdmin) {
+    ElMessage.warning('只有管理员可以修改首页布局')
+    return
   }
-  homeLayout.pageSize = payload.pageSize
-  homeLayout.hotCount = payload.hotCount
-  homeLayout.levelCount = payload.levelCount
-  homeLayout.advertCount = payload.advertCount
-  homeLayout.orders.hot = payload.orders.hot
-  homeLayout.orders.level = payload.orders.level
-  homeLayout.orders.profile = payload.orders.profile
-  localStorage.setItem(HOME_LAYOUT_STORAGE_KEY, JSON.stringify(payload))
-}
 
-function applyHomeLayout() {
-  saveHomeLayout()
-  settingVisible.value = false
-  fetchArticles(1)
-  fetchInsights()
+  const payload = buildLayoutPayload()
+  layoutSaving.value = true
+  applyHomeLayoutState(payload)
+
+  try {
+    const nextSiteInfo = {
+      ...siteInfo.value,
+      home_layout: payload
+    }
+    await apiUpdateSetting('site_info', nextSiteInfo)
+    siteInfo.value = nextSiteInfo
+    settingVisible.value = false
+    await Promise.all([fetchArticles(1), fetchInsights()])
+    ElMessage.success('首页布局已更新')
+  } catch (error) {
+    syncLayoutFromSiteInfo(siteInfo.value)
+    ElMessage.error(error?.response?.data?.msg || '首页布局保存失败')
+  } finally {
+    layoutSaving.value = false
+  }
 }
 
 function resetHomeLayout() {
@@ -858,16 +904,18 @@ function openService() {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-onMounted(() => {
+onMounted(async () => {
   expandTags.value = false
-  Promise.all([
-    fetchAnnouncements(),
-    fetchInsights(),
-    fetchTopViewedArticles(),
-    fetchArticles(1),
-    fetchSideData(),
-    fetchUserLevelRanking()
-  ]).catch(() => {})
+  try {
+    await fetchSideData()
+    await Promise.all([
+      fetchAnnouncements(),
+      fetchInsights(),
+      fetchTopViewedArticles(),
+      fetchArticles(1),
+      fetchUserLevelRanking()
+    ])
+  } catch {}
 })
 
 watch(recommendSort, () => {

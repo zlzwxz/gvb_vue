@@ -25,6 +25,8 @@
             发布主题
           </el-button>
           <el-icon class="search-icon" @click="goTo('Search')"><Search /></el-icon>
+          <span class="text-btn" @click="goTo('CommunityHub')">闲聊</span>
+          <span class="text-btn" @click="goTo('BountyHub')">赏金</span>
           <span class="text-btn" @click="goTo('Games')">小游戏</span>
           <template v-if="!userStore.isLoggedIn">
             <span class="text-btn" @click="goTo('Login')">登录</span>
@@ -53,6 +55,30 @@
     </header>
 
     <main class="main-content">
+      <section v-if="showFrontBreadcrumb" class="breadcrumb-panel">
+        <div class="breadcrumb-bar">
+          <el-button text class="breadcrumb-back" @click="goBackByBreadcrumb">
+            <el-icon><ArrowLeft /></el-icon>
+            返回上一级
+          </el-button>
+          <el-breadcrumb separator="/" class="breadcrumb-nav">
+            <el-breadcrumb-item
+              v-for="item in frontBreadcrumbs"
+              :key="`${item.label}-${item.to || 'current'}`"
+            >
+              <a
+                v-if="item.to && !item.current"
+                href="#"
+                class="breadcrumb-link"
+                @click.prevent="goBreadcrumb(item.to)"
+              >
+                {{ item.label }}
+              </a>
+              <span v-else class="breadcrumb-current">{{ item.label }}</span>
+            </el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
+      </section>
       <router-view />
     </main>
 
@@ -81,12 +107,13 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useSocialStore } from '@/stores/social'
-import { ArrowDownBold, ArrowUpBold, Plus, Search } from '@element-plus/icons-vue'
+import { ArrowDownBold, ArrowLeft, ArrowUpBold, Plus, Search } from '@element-plus/icons-vue'
 import { apiGetMenuList } from '@/api/menu'
 import { apiGetDataSum, apiGetPublicSiteInfo } from '@/api/system'
 import { ElMessage } from 'element-plus'
 import DOMPurify from 'dompurify'
 import FriendFloatPanel from '@/components/social/FriendFloatPanel.vue'
+import { buildFrontBreadcrumbs, resolveBreadcrumbFallback } from '@/utils/breadcrumb'
 
 const router = useRouter()
 const route = useRoute()
@@ -108,6 +135,8 @@ const metrics = ref({
   now_login_count: 0
 })
 const showFloatNav = ref(false)
+const frontBreadcrumbs = computed(() => buildFrontBreadcrumbs(route))
+const showFrontBreadcrumb = computed(() => route.name !== 'Home' && frontBreadcrumbs.value.length > 0)
 const safeCopyright = computed(() => {
   const html = settings.value.site_copyright || settings.value.profile || ''
   return DOMPurify.sanitize(String(html), {
@@ -164,6 +193,21 @@ function goToMenu(path) {
     return
   }
   router.push(path)
+}
+
+function goBreadcrumb(target) {
+  if (!target) return
+  router.push(target)
+}
+
+function goBackByBreadcrumb() {
+  const fallback = resolveBreadcrumbFallback(frontBreadcrumbs.value, '/')
+  const back = window.history.state?.back
+  if (typeof back === 'string' && back.startsWith('/')) {
+    router.back()
+    return
+  }
+  router.push(fallback)
 }
 
 function goPublish() {
@@ -373,6 +417,42 @@ onBeforeUnmount(() => {
   padding: 0 12px;
 }
 
+.breadcrumb-panel {
+  margin-bottom: 14px;
+}
+
+.breadcrumb-bar {
+  border-radius: 14px;
+  border: 1px solid #dce7f2;
+  background: linear-gradient(180deg, #fbfdff 0%, #f4f9fd 100%);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.breadcrumb-back {
+  padding: 0;
+}
+
+.breadcrumb-nav {
+  min-width: 0;
+}
+
+.breadcrumb-link {
+  color: #0f7ea5;
+  text-decoration: none;
+}
+
+.breadcrumb-link:hover {
+  color: #0a6381;
+}
+
+.breadcrumb-current {
+  color: #4d6783;
+}
+
 .footer {
   text-align: center;
   padding: 20px;
@@ -424,6 +504,10 @@ onBeforeUnmount(() => {
 
   .header-right {
     flex-wrap: wrap;
+  }
+
+  .breadcrumb-bar {
+    align-items: flex-start;
   }
 
   .float-nav {

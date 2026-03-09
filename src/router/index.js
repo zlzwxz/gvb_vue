@@ -59,6 +59,30 @@ const frontRoutes = [
         meta: { title: '公共聊天室' }
       },
       {
+        path: 'community',
+        name: 'CommunityHub',
+        component: () => import('@/views/front/CommunityHubView.vue'),
+        meta: { title: '闲聊广场', scene: 'plaza' }
+      },
+      {
+        path: 'community/:id',
+        name: 'CommunityPostDetail',
+        component: () => import('@/views/front/CommunityPostDetailView.vue'),
+        meta: { title: '交流帖详情', scene: 'plaza' }
+      },
+      {
+        path: 'bounty',
+        name: 'BountyHub',
+        component: () => import('@/views/front/CommunityHubView.vue'),
+        meta: { title: '赏金大厅', scene: 'bounty' }
+      },
+      {
+        path: 'bounty/:id',
+        name: 'BountyPostDetail',
+        component: () => import('@/views/front/CommunityPostDetailView.vue'),
+        meta: { title: '赏金详情', scene: 'bounty' }
+      },
+      {
         path: 'messages',
         name: 'PrivateMessages',
         component: () => import('@/views/front/PrivateMessageView.vue'),
@@ -168,6 +192,12 @@ const adminRoutes = [
         name: 'SocialManage',
         component: () => import('@/views/admin/SocialManageView.vue'),
         meta: { title: '好友管理', icon: 'User', requiresAdmin: true }
+      },
+      {
+        path: 'community',
+        name: 'CommunityManage',
+        component: () => import('@/views/admin/CommunityManageView.vue'),
+        meta: { title: '社区悬赏', icon: 'ChatDotRound', requiresAdmin: true }
       },
       {
         path: 'announcements',

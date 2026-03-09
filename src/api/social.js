@@ -38,3 +38,14 @@ export const apiUpdateSocialPresence = (data) => request.put('/social/presence',
 export const apiUploadSocialFile = (formData) => request.post('/social/files', formData, {
   headers: { 'Content-Type': 'multipart/form-data' }
 })
+
+export const apiGetCommunityMeta = (params) => request.get('/social/community/meta', { params })
+export const apiGetCommunityPostList = (params) => request.get('/social/community/posts', { params })
+export const apiGetCommunityPostDetail = (id) => request.get(`/social/community/posts/${id}`)
+export const apiCreateCommunityPost = (data) => request.post('/social/community/posts', data)
+export const apiDeleteCommunityPost = (id) => request.delete(`/social/community/posts/${id}`)
+export const apiCreateCommunityReply = (id, data) => request.post(`/social/community/posts/${id}/replies`, data)
+export const apiAcceptCommunityBounty = (id) => request.post(`/social/community/posts/${id}/accept`)
+export const apiUpdateCommunityPostStatus = (id, data) => request.put(`/social/community/posts/${id}/status`, data)
+export const apiToggleCommunityPostPin = (id, data) => request.put(`/social/community/posts/${id}/pin`, data)
+export const apiGetAdminCommunityPostList = (params) => request.get('/social/manage/community', { params })

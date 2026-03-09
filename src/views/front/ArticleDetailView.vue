@@ -562,6 +562,7 @@ async function loadArticle() {
     
     const res = await apiGetArticleDetail(route.params.id)
     article.value = res.data || res
+    syncArticleBreadcrumb()
     await loadArticleTOC()
     await nextTick()
     syncTocWithContent()
@@ -662,6 +663,43 @@ function extractSlugAnchor(item) {
   } catch {
     return anchor
   }
+}
+
+function syncArticleBreadcrumb() {
+  const nextTitle = String(article.value?.title || '').trim()
+  if (!nextTitle) return
+
+  const nextQuery = { ...route.query }
+  let changed = false
+
+  if (String(nextQuery.title || '').trim() !== nextTitle) {
+    nextQuery.title = nextTitle
+    changed = true
+  }
+
+  const boardName = String(article.value?.board_name || '').trim()
+  const boardSlug = String(article.value?.board_slug || '').trim()
+  const boardId = String(article.value?.board_id || '').trim()
+  const boardKey = boardSlug || boardId
+  if (boardName && boardKey) {
+    const boardPath = `/board/${boardKey}`
+    if (String(nextQuery.board_name || '').trim() !== boardName) {
+      nextQuery.board_name = boardName
+      changed = true
+    }
+    if (String(nextQuery.board_path || '').trim() !== boardPath) {
+      nextQuery.board_path = boardPath
+      changed = true
+    }
+  }
+
+  if (!changed) return
+
+  router.replace({
+    name: 'ArticleDetail',
+    params: { id: String(route.params.id) },
+    query: nextQuery
+  })
 }
 
 function inferLevelFromTitle(title) {

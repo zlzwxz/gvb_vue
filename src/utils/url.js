@@ -71,6 +71,21 @@ function normalizeKnownResourcePath(value) {
   return normalized
 }
 
+function appendAccessToken(urlValue) {
+  const token = String(localStorage.getItem('token') || '').trim()
+  if (!token) return urlValue
+  try {
+    const resolved = apiOrigin ? new URL(urlValue, apiOrigin) : new URL(urlValue, window.location.origin)
+    if (!resolved.pathname.startsWith('/uploads/')) return urlValue
+    if (!resolved.searchParams.get('token')) {
+      resolved.searchParams.set('token', token)
+    }
+    return resolved.toString()
+  } catch {
+    return urlValue
+  }
+}
+
 // 图片、附件、二维码等资源地址统一走这个方法。
 export function resolveResourceUrl(value) {
   const cleanedValue = cleanRelativePath(value)
@@ -84,15 +99,15 @@ export function resolveResourceUrl(value) {
   const normalized = normalizeKnownResourcePath(cleanedValue)
 
   if (normalized.startsWith('/api/') || normalized.startsWith('/uploads/')) {
-    return withOrigin(normalized)
+    return appendAccessToken(withOrigin(normalized))
   }
   if (normalized.startsWith('api/') || normalized.startsWith('uploads/')) {
-    return withOrigin(`/${normalized}`)
+    return appendAccessToken(withOrigin(`/${normalized}`))
   }
   if (normalized.startsWith('/')) {
-    return withOrigin(normalized)
+    return appendAccessToken(withOrigin(normalized))
   }
-  return withOrigin(`/uploads/${normalized}`)
+  return appendAccessToken(withOrigin(`/uploads/${normalized}`))
 }
 
 // 普通链接统一走这个方法。

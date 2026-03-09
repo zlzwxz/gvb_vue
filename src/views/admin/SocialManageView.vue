@@ -7,6 +7,14 @@
       </article>
     </section>
 
+    <section class="manage-tip">
+      <strong>快捷说明</strong>
+      <p>
+        这里的“去聊天”会跳到前台私信页，并使用你当前登录的账号发起会话。
+        它不会模拟表格中的两位用户互相聊天，这样可以避免后台管理和真实聊天身份混淆。
+      </p>
+    </section>
+
     <el-card shadow="never">
       <div class="toolbar">
         <div class="toolbar-left">
@@ -27,8 +35,8 @@
             clearable
             placeholder="搜索用户昵称、ID、群号或备注"
             style="width: 260px"
-            @clear="fetchCurrent(1)"
-            @keyup.enter="fetchCurrent(1)"
+            @clear="triggerSearch"
+            @keyup.enter="triggerSearch"
           />
           <el-button @click="refreshAll" :loading="loading">刷新</el-button>
         </div>
@@ -69,6 +77,18 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="建立时间" width="180" />
+        <el-table-column label="操作" min-width="220" fixed="right">
+          <template #default="{ row }">
+            <div class="action-cell">
+              <el-button type="primary" link @click="goDirectChat(row.user_id)">
+                聊发起方
+              </el-button>
+              <el-button type="success" link @click="goDirectChat(row.follow_user_id)">
+                聊目标方
+              </el-button>
+            </div>
+          </template>
+        </el-table-column>
       </el-table>
 
       <el-table v-else-if="activeTab === 'blocks'" :data="blockList" stripe v-loading="loading">
@@ -100,6 +120,18 @@
         </el-table-column>
         <el-table-column prop="reason" label="原因" min-width="220" show-overflow-tooltip />
         <el-table-column prop="created_at" label="拉黑时间" width="180" />
+        <el-table-column label="操作" min-width="220" fixed="right">
+          <template #default="{ row }">
+            <div class="action-cell">
+              <el-button type="primary" link @click="goDirectChat(row.user_id)">
+                聊拉黑人
+              </el-button>
+              <el-button type="warning" link @click="goDirectChat(row.block_user_id)">
+                聊被拉黑用户
+              </el-button>
+            </div>
+          </template>
+        </el-table-column>
       </el-table>
 
       <el-table v-else :data="groupList" stripe v-loading="loading">
@@ -120,6 +152,18 @@
         <el-table-column prop="member_count" label="成员数" width="100" />
         <el-table-column prop="notice" label="群公告" min-width="240" show-overflow-tooltip />
         <el-table-column prop="updated_at" label="最近活跃" width="180" />
+        <el-table-column label="操作" min-width="220" fixed="right">
+          <template #default="{ row }">
+            <div class="action-cell">
+              <el-button type="primary" link @click="goDirectChat(row.owner_user_id)">
+                联系群主
+              </el-button>
+              <el-button type="success" link @click="goGroupChat(row.id)">
+                进入群聊
+              </el-button>
+            </div>
+          </template>
+        </el-table-column>
       </el-table>
 
       <el-empty v-if="!loading && !currentList.length" :description="emptyText" />
@@ -139,7 +183,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   apiGetSocialManageBlocks,
@@ -148,6 +193,7 @@ import {
   apiGetSocialManageSummary
 } from '@/api/social'
 
+const router = useRouter()
 const activeTab = ref('friends')
 const relationMode = ref('friend')
 const search = ref('')
@@ -159,6 +205,7 @@ const overview = ref({})
 const friendList = ref([])
 const blockList = ref([])
 const groupList = ref([])
+let searchTimer = 0
 
 const summaryItems = [
   { key: 'mutual_friend_count', label: '双向好友' },
@@ -184,6 +231,24 @@ const emptyText = computed(() => {
 
 function avatarText(value) {
   return String(value || '友').trim().charAt(0) || '友'
+}
+
+function goDirectChat(userId) {
+  const target = Number(userId || 0)
+  if (!target) {
+    ElMessage.warning('目标用户不存在，无法跳转聊天')
+    return
+  }
+  router.push({ name: 'PrivateMessages', query: { user_id: String(target) } })
+}
+
+function goGroupChat(groupId) {
+  const target = Number(groupId || 0)
+  if (!target) {
+    ElMessage.warning('目标群组不存在，无法进入群聊')
+    return
+  }
+  router.push({ name: 'PrivateMessages', query: { group_id: String(target) } })
 }
 
 async function fetchSummary() {
@@ -252,12 +317,37 @@ async function refreshAll() {
   await Promise.all([fetchSummary(), fetchCurrent(page.value)])
 }
 
+function queueSearch() {
+  if (searchTimer) window.clearTimeout(searchTimer)
+  searchTimer = window.setTimeout(() => {
+    searchTimer = 0
+    fetchCurrent(1)
+  }, 260)
+}
+
+function triggerSearch() {
+  if (searchTimer) {
+    window.clearTimeout(searchTimer)
+    searchTimer = 0
+  }
+  fetchCurrent(1)
+}
+
 watch(activeTab, () => {
   fetchCurrent(1)
 })
 
+watch(search, (value, oldValue) => {
+  if (value === oldValue) return
+  queueSearch()
+})
+
 onMounted(async () => {
   await Promise.all([fetchSummary(), fetchCurrent(1)])
+})
+
+onBeforeUnmount(() => {
+  if (searchTimer) window.clearTimeout(searchTimer)
 })
 </script>
 
@@ -265,6 +355,26 @@ onMounted(async () => {
 .social-manage-page {
   display: grid;
   gap: 14px;
+}
+
+.manage-tip {
+  border-radius: 16px;
+  padding: 14px 16px;
+  border: 1px solid #cfe3f4;
+  background: linear-gradient(180deg, #f7fbff 0%, #eef6fd 100%);
+}
+
+.manage-tip strong {
+  display: block;
+  color: #174064;
+  font-size: 14px;
+}
+
+.manage-tip p {
+  margin: 8px 0 0;
+  color: #53708c;
+  line-height: 1.7;
+  font-size: 13px;
 }
 
 .summary-grid {
@@ -330,6 +440,13 @@ onMounted(async () => {
   margin-top: 2px;
   color: #6f839e;
   font-size: 12px;
+}
+
+.action-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .pager {

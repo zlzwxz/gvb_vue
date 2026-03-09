@@ -125,6 +125,131 @@
                 </div>
               </el-form-item>
             </template>
+
+            <template v-if="tab.name === 'es'">
+              <el-divider />
+              <el-form-item label="ES 工具区" class="full-line">
+                <div class="es-tool-block">
+                  <div class="es-tool-head">
+                    <div>
+                      <strong>索引导入导出</strong>
+                      <p>
+                        先选择索引再导出。页面导入目前只支持 `article_index`，
+                        并且会按文章创建规则逐条校验 JSON 结构、标题重复、板块、作者、封面等数据。
+                      </p>
+                    </div>
+                    <div class="crawl-action-row">
+                      <el-button @click="loadESIndices" :loading="esIndexLoading">刷新索引</el-button>
+                      <el-button
+                        type="primary"
+                        :loading="esExporting"
+                        :disabled="!selectedESIndex"
+                        @click="exportSelectedESIndex"
+                      >
+                        导出选中索引
+                      </el-button>
+                    </div>
+                  </div>
+
+                  <el-table
+                    :data="esIndexList"
+                    border
+                    size="small"
+                    v-loading="esIndexLoading"
+                    class="es-index-table"
+                    @row-click="selectESIndex"
+                  >
+                    <el-table-column label="选择" width="100">
+                      <template #default="{ row }">
+                        <el-tag v-if="selectedESIndex === row.name" type="success" effect="plain">已选中</el-tag>
+                        <el-button v-else link type="primary" @click.stop="selectESIndex(row)">选择</el-button>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="name" label="索引名" min-width="180" />
+                    <el-table-column prop="docs_count" label="文档数" width="110" />
+                    <el-table-column label="能力" width="180">
+                      <template #default="{ row }">
+                        <div class="es-capability">
+                          <el-tag size="small" type="primary" effect="plain">可导出</el-tag>
+                          <el-tag
+                            size="small"
+                            :type="row.import_supported ? 'success' : 'info'"
+                            effect="plain"
+                          >
+                            {{ row.import_supported ? '可导入' : '仅导出' }}
+                          </el-tag>
+                        </div>
+                      </template>
+                    </el-table-column>
+                    <el-table-column prop="description" label="说明" min-width="260" />
+                  </el-table>
+
+                  <div class="es-action-bar">
+                    <div class="es-selected-info">
+                      <strong>当前选中：</strong>
+                      <span>{{ selectedESIndex || '未选择索引' }}</span>
+                      <span v-if="selectedESIndexMeta"> · 文档 {{ Number(selectedESIndexMeta.docs_count || 0) }} 条</span>
+                    </div>
+
+                    <el-upload
+                      :show-file-list="false"
+                      accept=".json,application/json"
+                      :disabled="!selectedESIndexMeta?.import_supported"
+                      :http-request="importESIndexFile"
+                    >
+                      <el-button
+                        type="success"
+                        :loading="esImporting"
+                        :disabled="!selectedESIndexMeta?.import_supported"
+                      >
+                        导入 JSON
+                      </el-button>
+                    </el-upload>
+                  </div>
+
+                  <div class="form-tip">
+                    导入说明：
+                    只有 `article_index` 支持页面导入；导入文件建议直接使用本页导出的 JSON。
+                    如果文件结构不对、文章标题重复，或者引用了不存在的板块 / 用户 / 封面，结果里都会显示失败原因。
+                  </div>
+                  <div v-if="lastImportFileName" class="es-last-file">
+                    最近导入文件：{{ lastImportFileName }}
+                  </div>
+
+                  <div v-if="esImportResult" class="es-import-result">
+                    <div class="es-import-summary">
+                      <span>总数 {{ Number(esImportResult.total || 0) }}</span>
+                      <span>成功 {{ Number(esImportResult.success || 0) }}</span>
+                      <span>失败 {{ Number(esImportResult.failed || 0) }}</span>
+                      <span v-if="esImportResult.completed">完成时间 {{ esImportResult.completed }}</span>
+                    </div>
+
+                    <el-alert
+                      :title="`导入结果：成功 ${Number(esImportResult.success || 0)} 条，失败 ${Number(esImportResult.failed || 0)} 条`"
+                      :type="Number(esImportResult.failed || 0) > 0 ? 'warning' : 'success'"
+                      :closable="false"
+                      show-icon
+                    />
+
+                    <el-table
+                      v-if="importFailurePreview.length"
+                      :data="importFailurePreview"
+                      border
+                      size="small"
+                      class="es-failure-table"
+                    >
+                      <el-table-column prop="row" label="序号" width="80" />
+                      <el-table-column prop="source_id" label="源文档 ID" min-width="160" />
+                      <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
+                      <el-table-column prop="message" label="失败原因" min-width="280" show-overflow-tooltip />
+                    </el-table>
+                    <div v-if="Number(esImportResult.failed || 0) > importFailurePreview.length" class="form-tip">
+                      失败明细较多，当前仅展示前 {{ importFailurePreview.length }} 条。
+                    </div>
+                  </div>
+                </div>
+              </el-form-item>
+            </template>
           </el-form>
         </el-tab-pane>
       </el-tabs>
@@ -133,9 +258,19 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { apiGetNewsSourceList, apiGetPublicSiteInfo, apiGetSettings, apiPreviewFengfengArticles, apiSyncFengfengArticles, apiUpdateSetting } from '@/api/system'
+import {
+  apiExportESIndex,
+  apiGetESIndices,
+  apiGetNewsSourceList,
+  apiGetPublicSiteInfo,
+  apiGetSettings,
+  apiImportESIndex,
+  apiPreviewFengfengArticles,
+  apiSyncFengfengArticles,
+  apiUpdateSetting
+} from '@/api/system'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -144,6 +279,19 @@ const previewing = ref(false)
 const crawlStat = ref(null)
 const activeTab = ref('system')
 const newsSourceList = ref([])
+const esIndexLoading = ref(false)
+const esExporting = ref(false)
+const esImporting = ref(false)
+const esIndexList = ref([])
+const selectedESIndex = ref('')
+const esImportResult = ref(null)
+const lastImportFileName = ref('')
+
+const selectedESIndexMeta = computed(() => esIndexList.value.find(item => item.name === selectedESIndex.value) || null)
+const importFailurePreview = computed(() => {
+  const list = Array.isArray(esImportResult.value?.failures) ? esImportResult.value.failures : []
+  return list.slice(0, 20)
+})
 
 const schemaMap = {
   system: {
@@ -327,6 +475,9 @@ async function loadConfigByName(name = activeTab.value) {
     if (name === 'news' && !newsSourceList.value.length) {
       await loadNewsSources()
     }
+    if (name === 'es') {
+      await loadESIndices()
+    }
 
     const res = name === 'site_info' ? await apiGetSettings(name).catch(async () => apiGetPublicSiteInfo()) : await apiGetSettings(name)
     const rawData = res.data || {}
@@ -372,6 +523,104 @@ function formatSourceLabel(source) {
   const category = source?.category || '未分类'
   const id = source?.id || ''
   return `${name} · ${type} · ${category} (${id})`
+}
+
+async function loadESIndices() {
+  esIndexLoading.value = true
+  try {
+    const res = await apiGetESIndices()
+    esIndexList.value = Array.isArray(res.data) ? res.data : []
+    if (!esIndexList.value.some(item => item.name === selectedESIndex.value)) {
+      selectedESIndex.value = esIndexList.value[0]?.name || ''
+    }
+  } catch (e) {
+    esIndexList.value = []
+    selectedESIndex.value = ''
+    ElMessage.error(e?.response?.data?.msg || '获取 ES 索引列表失败')
+  } finally {
+    esIndexLoading.value = false
+  }
+}
+
+function selectESIndex(row) {
+  if (!row?.name) return
+  selectedESIndex.value = row.name
+}
+
+async function exportSelectedESIndex() {
+  if (!selectedESIndex.value) {
+    ElMessage.warning('请先选择要导出的索引')
+    return
+  }
+  esExporting.value = true
+  try {
+    const response = await apiExportESIndex(selectedESIndex.value)
+    const { blob, fileName } = await resolveDownloadResponse(response)
+    downloadBlob(blob, fileName || `${selectedESIndex.value}.json`)
+    ElMessage.success('索引导出成功')
+  } catch (e) {
+    ElMessage.error(e?.message || '索引导出失败')
+  } finally {
+    esExporting.value = false
+  }
+}
+
+async function importESIndexFile(option) {
+  if (!selectedESIndexMeta.value?.import_supported) {
+    const error = new Error('当前索引不支持页面导入')
+    option?.onError?.(error)
+    ElMessage.warning(error.message)
+    return
+  }
+  esImporting.value = true
+  lastImportFileName.value = option?.file?.name || ''
+  try {
+    const formData = new FormData()
+    formData.append('index', selectedESIndex.value)
+    formData.append('file', option.file)
+    const res = await apiImportESIndex(formData)
+    esImportResult.value = res.data || null
+    option?.onSuccess?.(res)
+    ElMessage.success(res.msg || '导入完成')
+    await loadESIndices()
+  } catch (e) {
+    option?.onError?.(e)
+    ElMessage.error(e?.response?.data?.msg || e?.message || '导入失败')
+  } finally {
+    esImporting.value = false
+  }
+}
+
+async function resolveDownloadResponse(response) {
+  const disposition = String(response?.headers?.['content-disposition'] || '')
+  if (!disposition) {
+    const text = await response.data.text()
+    try {
+      const payload = JSON.parse(text)
+      throw new Error(payload?.msg || '导出失败')
+    } catch (e) {
+      if (e instanceof SyntaxError) {
+        throw new Error('导出失败，返回内容无法识别')
+      }
+      throw e
+    }
+  }
+
+  const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: 'application/json' })
+  const matched = disposition.match(/filename\*=UTF-8''([^;]+)|filename=\"?([^\";]+)\"?/i)
+  const fileName = matched?.[1] ? decodeURIComponent(matched[1]) : (matched?.[2] || '')
+  return { blob, fileName }
+}
+
+function downloadBlob(blob, fileName) {
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = fileName || `export_${Date.now()}.json`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  window.URL.revokeObjectURL(url)
 }
 
 async function saveCurrent() {
@@ -496,6 +745,78 @@ onMounted(() => {
   line-height: 1.7;
 }
 
+.es-tool-block {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.es-tool-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.es-tool-head strong,
+.es-selected-info strong {
+  color: #1b3f64;
+}
+
+.es-tool-head p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #69839e;
+  line-height: 1.7;
+}
+
+.es-index-table,
+.es-failure-table {
+  width: 100%;
+}
+
+.es-capability {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.es-action-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.es-selected-info {
+  font-size: 13px;
+  color: #456b92;
+  line-height: 1.7;
+}
+
+.es-last-file {
+  font-size: 12px;
+  color: #69839e;
+}
+
+.es-import-result {
+  display: grid;
+  gap: 10px;
+  border-radius: 12px;
+  border: 1px solid #dce8f4;
+  padding: 12px;
+  background: #f8fbff;
+}
+
+.es-import-summary {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: #456b92;
+}
+
 @media (max-width: 900px) {
   .header-row {
     flex-direction: column;
@@ -503,6 +824,12 @@ onMounted(() => {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .es-tool-head,
+  .es-action-bar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

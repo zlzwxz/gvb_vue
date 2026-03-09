@@ -13,6 +13,18 @@ export const apiGetSevenLoginData = () => request.get('/data_login')
 export const apiGetSettings = (name) => request.get(`/settings/${name}`)
 export const apiUpdateSetting = (name, data) => request.put(`/settings/${name}`, data)
 export const apiGetPublicSiteInfo = () => request.get('/settings/public/site_info')
+export const apiGetESIndices = () => request.get('/settings/es/indices')
+export const apiExportESIndex = (index) => request.get('/settings/es/export', {
+  params: { index },
+  responseType: 'blob',
+  timeout: 60000
+})
+export const apiImportESIndex = (formData) => request.post('/settings/es/import', formData, {
+  timeout: 300000,
+  headers: {
+    'Content-Type': 'multipart/form-data'
+  }
+})
 const crawlPreviewConfig = {
   timeout: 60000,
   timeoutErrorMessage: '检索超时，请缩小检索范围后重试'

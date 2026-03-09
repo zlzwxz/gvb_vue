@@ -106,7 +106,9 @@
 - `src/views/front/PrivateMessageView.vue`
   私信、群聊、文件发送、消息搜索、黑名单、群详情等都在这里。
 - `src/components/social/FriendFloatPanel.vue`
-  页面右侧好友浮层入口。
+  页面右侧好友浮层入口，支持拖拽和位置本地记忆。
+- `src/views/front/HomeView.vue`
+  首页会读取公开 `site_info.home_layout`，所以布局设置现在是站点级配置，不再是用户本地配置。
 
 ### 6.3 实时消息
 
@@ -124,6 +126,14 @@
 3. 对方接受后，双方开始 WebRTC 协商
 4. `offer / answer / candidate` 都通过 WebSocket 交换
 5. 真正音频流通过 WebRTC 点对点传输
+
+### 6.5 首页布局配置
+
+1. `src/views/front/HomeView.vue` 通过 `apiGetPublicSiteInfo()` 拉取公开站点信息
+2. 返回的 `site_info` 里包含 `home_layout`
+3. 首页按这份配置渲染热榜、等级榜、个人介绍的数量和顺序
+4. 只有管理员能看到“布局设置”按钮
+5. 保存时会走 `apiUpdateSetting('site_info', ...)`，把布局写回站点配置
 
 ## 7. 目录地图
 
@@ -147,7 +157,7 @@
 
 ### `src/components`
 
-- `src/components/social/FriendFloatPanel.vue`: 右侧好友浮层、好友列表入口、在线状态编辑、语音来电弹窗
+- `src/components/social/FriendFloatPanel.vue`: 右侧好友浮层、好友列表入口、在线状态编辑、语音来电弹窗、拖拽定位
 
 ### `src/layouts`
 
@@ -189,8 +199,8 @@
 - `LogManageView.vue`: 日志管理
 - `MenuManageView.vue`: 菜单管理
 - `MessageManageView.vue`: 消息管理
-- `SettingManageView.vue`: 系统设置
-- `SocialManageView.vue`: 好友/社交管理
+- `SettingManageView.vue`: 系统设置，包含 `site_info` 等站点公共配置
+- `SocialManageView.vue`: 好友/社交管理，支持自动筛选刷新和跳转私信/群聊
 - `TagManageView.vue`: 标签管理
 - `UserManageView.vue`: 用户管理
 
@@ -203,7 +213,7 @@
 - `ChatRoomView.vue`: 公共聊天室
 - `CollectView.vue`: 我的收藏
 - `GameHubView.vue`: 小游戏页
-- `HomeView.vue`: 首页
+- `HomeView.vue`: 首页，读取公共站点信息和 `home_layout`
 - `NewsView.vue`: 资讯页
 - `PrivateMessageView.vue`: 私信 / 群聊中心
 - `ProfileView.vue`: 当前用户个人中心
@@ -275,3 +285,13 @@
 1. 登录线：`main.js -> router/index.js -> stores/user.js -> api/user.js`
 2. 图片线：`页面模板 -> $resolveImg -> utils/url.js -> 后端 /uploads`
 3. 社交线：`FriendFloatPanel/PrivateMessageView -> stores/social.js -> 后端 social API`
+
+## 11. 第二层细化阅读
+
+如果你已经知道社交功能的大体入口，下一步建议读：
+
+- `SOCIAL_FRIEND_MANAGEMENT_DETAIL.md`
+
+如果你想看后台系统设置里新增的 ES 导入导出工具，建议顺着这条线看：
+
+- `views/admin/SettingManageView.vue -> api/system.js -> 后端 settings/es 接口`

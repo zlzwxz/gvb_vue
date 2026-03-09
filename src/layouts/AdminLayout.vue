@@ -38,6 +38,7 @@
             <el-menu-item index="/admin/menus"><el-icon><Menu /></el-icon>导航管理</el-menu-item>
             <el-menu-item index="/admin/boards"><el-icon><Grid /></el-icon>板块管理</el-menu-item>
             <el-menu-item index="/admin/socials"><el-icon><User /></el-icon>好友管理</el-menu-item>
+            <el-menu-item index="/admin/community"><el-icon><ChatDotRound /></el-icon>社区悬赏</el-menu-item>
             <el-menu-item index="/admin/announcements"><el-icon><Bell /></el-icon>公告管理</el-menu-item>
             <el-menu-item index="/admin/comments"><el-icon><ChatDotRound /></el-icon>评论管理</el-menu-item>
             <el-menu-item index="/admin/chats"><el-icon><ChatLineSquare /></el-icon>群聊管理</el-menu-item>
@@ -64,10 +65,28 @@
           </el-button>
           <div class="header-titles">
             <h2>{{ pageTitle }}</h2>
-            <el-breadcrumb separator="/" class="breadcrumb">
-              <el-breadcrumb-item>控制台</el-breadcrumb-item>
-              <el-breadcrumb-item>{{ pageTitle }}</el-breadcrumb-item>
-            </el-breadcrumb>
+            <div class="breadcrumb-row">
+              <el-button text class="breadcrumb-back" @click="goAdminBack">
+                <el-icon><ArrowLeft /></el-icon>
+                返回上一级
+              </el-button>
+              <el-breadcrumb separator="/" class="breadcrumb">
+                <el-breadcrumb-item
+                  v-for="item in adminBreadcrumbs"
+                  :key="`${item.label}-${item.to || 'current'}`"
+                >
+                  <a
+                    v-if="item.to && !item.current"
+                    href="#"
+                    class="breadcrumb-link"
+                    @click.prevent="goBreadcrumb(item.to)"
+                  >
+                    {{ item.label }}
+                  </a>
+                  <span v-else class="breadcrumb-current">{{ item.label }}</span>
+                </el-breadcrumb-item>
+              </el-breadcrumb>
+            </div>
           </div>
         </div>
 
@@ -109,6 +128,7 @@ import { ElMessage } from 'element-plus'
 import {
   Bell,
   ArrowDown,
+  ArrowLeft,
   ChatDotRound,
   ChatLineSquare,
   CollectionTag,
@@ -133,6 +153,7 @@ import {
   User,
   WarningFilled
 } from '@element-plus/icons-vue'
+import { buildAdminBreadcrumbs, resolveBreadcrumbFallback } from '@/utils/breadcrumb'
 
 const router = useRouter()
 const route = useRoute()
@@ -140,6 +161,7 @@ const userStore = useUserStore()
 const isCollapse = ref(false)
 
 const pageTitle = computed(() => String(route.meta.title || '后台管理'))
+const adminBreadcrumbs = computed(() => buildAdminBreadcrumbs(route))
 
 function goDashboard() {
   router.push('/admin/dashboard')
@@ -147,6 +169,21 @@ function goDashboard() {
 
 function goWriteArticle() {
   router.push('/admin/article/edit')
+}
+
+function goBreadcrumb(target) {
+  if (!target) return
+  router.push(target)
+}
+
+function goAdminBack() {
+  const fallback = resolveBreadcrumbFallback(adminBreadcrumbs.value, '/admin/dashboard')
+  const back = window.history.state?.back
+  if (typeof back === 'string' && back.startsWith('/')) {
+    router.back()
+    return
+  }
+  router.push(fallback)
 }
 
 function handleLogout() {
@@ -259,6 +296,30 @@ function handleCommand(command) {
   margin-top: 3px;
 }
 
+.breadcrumb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.breadcrumb-back {
+  padding: 0;
+}
+
+.breadcrumb-link {
+  color: #0f7ea5;
+  text-decoration: none;
+}
+
+.breadcrumb-link:hover {
+  color: #0a6381;
+}
+
+.breadcrumb-current {
+  color: #5a7390;
+}
+
 .header-right {
   display: flex;
   align-items: center;
@@ -288,6 +349,10 @@ function handleCommand(command) {
 @media (max-width: 992px) {
   .header-right .el-button:nth-child(2) {
     display: none;
+  }
+
+  .breadcrumb-row {
+    align-items: flex-start;
   }
 }
 </style>

@@ -118,7 +118,7 @@
                 :key="`pin-${item.id}`"
                 type="button"
                 class="pinned-item"
-                @click="goDetail(item.id)"
+                @click="goDetail(item)"
               >
                 <div class="pinned-main">
                   <strong>{{ item.title }}</strong>
@@ -142,7 +142,7 @@
                 v-for="item in featuredArticles"
                 :key="`featured-${item.id}`"
                 class="featured-card"
-                @click="goDetail(item.id)"
+                @click="goDetail(item)"
               >
                 <div v-if="resolveBanner(item)" class="featured-cover">
                   <img :src="$resolveImg(resolveBanner(item))" :alt="item.title" />
@@ -173,7 +173,7 @@
                 v-for="item in articles"
                 :key="item.id"
                 class="thread-card"
-                @click="goDetail(item.id)"
+                @click="goDetail(item)"
               >
                 <div class="thread-main">
                   <div class="thread-head">
@@ -450,8 +450,18 @@ function goUserSpace(id) {
   router.push({ name: 'UserSpace', params: { id: String(id) } })
 }
 
-function goDetail(id) {
-  router.push({ name: 'ArticleDetail', params: { id } })
+function goDetail(item) {
+  const id = item?.id
+  if (!id) return
+  router.push({
+    name: 'ArticleDetail',
+    params: { id },
+    query: {
+      title: item?.title || '',
+      board_name: board.value?.name || '',
+      board_path: route.fullPath
+    }
+  })
 }
 
 function openAnnouncement(item) {
@@ -604,6 +614,17 @@ async function loadBoard() {
     const matched = list.find((item) => matchBoard(item, boardKey.value))
     board.value = matched || null
     if (!board.value) return
+
+    if (String(route.query.title || '').trim() !== String(board.value.name || '').trim()) {
+      router.replace({
+        name: 'BoardDetail',
+        params: { key: route.params.key },
+        query: {
+          ...route.query,
+          title: board.value.name || ''
+        }
+      })
+    }
 
     document.title = `${board.value.name} - GVB社区`
     await Promise.all([
