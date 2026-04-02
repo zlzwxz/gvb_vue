@@ -988,6 +988,17 @@ onBeforeUnmount(() => {
 .forum-home {
   display: grid;
   gap: 18px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+.forum-grid {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .forum-toolbar {
@@ -998,6 +1009,10 @@ onBeforeUnmount(() => {
   padding: 14px;
   display: grid;
   gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .feed-tabs {
@@ -1078,6 +1093,10 @@ onBeforeUnmount(() => {
   border: 1px solid #f4dec5;
   display: flex;
   gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .topic-title {
@@ -1117,6 +1136,10 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .announcement-list {
@@ -1251,6 +1274,10 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(220, 227, 238, 0.9);
   box-shadow: 0 8px 20px rgba(20, 40, 70, 0.06);
   padding: 16px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .panel + .panel {
@@ -1276,10 +1303,12 @@ onBeforeUnmount(() => {
 
 .top-slide-image {
   width: 100%;
+  max-width: 100%;
   height: 100%;
   object-fit: contain;
   background: #152338;
   display: block;
+  box-sizing: border-box;
 }
 
 .top-slide-fallback {
@@ -1353,6 +1382,10 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .thread-card {
@@ -1435,10 +1468,12 @@ onBeforeUnmount(() => {
 
 .thread-cover img {
   width: 100%;
+  max-width: 100%;
   height: 180px;
   object-fit: contain;
   background: #edf2f8;
   display: block;
+  box-sizing: border-box;
 }
 
 .thread-abstract {
@@ -1797,6 +1832,76 @@ onBeforeUnmount(() => {
 
   .topic-strip {
     flex-direction: column;
+    padding: 10px 12px;
+  }
+
+  .topic-title {
+    font-size: 12px;
+    margin-bottom: 8px;
+  }
+
+  .topic-list {
+    gap: 6px;
+  }
+
+  .topic-chip {
+    font-size: 11px;
+    padding: 4px 9px;
+  }
+
+  .topic-chip span {
+    font-size: 10px;
+  }
+
+  .feed-tabs {
+    gap: 8px;
+  }
+
+  .feed-tab {
+    min-width: 120px;
+    padding: 8px 10px;
+  }
+
+  .feed-tab strong {
+    font-size: 13px;
+  }
+
+  .feed-tab span {
+    font-size: 11px;
+  }
+
+  .channel-pills {
+    gap: 6px;
+  }
+
+  .channel-pill {
+    font-size: 11px;
+    padding: 5px 10px;
+  }
+
+  .search-row :deep(.el-input__wrapper) {
+    height: 36px;
+  }
+
+  .search-row :deep(.el-input__inner) {
+    font-size: 14px;
+  }
+
+  .search-row :deep(.el-button) {
+    height: 36px;
+    font-size: 13px;
+  }
+
+  .search-row :deep(.el-select) {
+    width: 130px !important;
+  }
+
+  .search-row :deep(.el-select__wrapper) {
+    height: 36px;
+  }
+
+  .search-row :deep(.el-select__input) {
+    font-size: 14px;
   }
 }
 
@@ -1817,8 +1922,170 @@ onBeforeUnmount(() => {
     grid-template-columns: 1fr;
   }
 
+  .thread-list {
+    gap: 10px;
+  }
+
+  .thread-card {
+    padding: 12px;
+  }
+
   .thread-title {
     font-size: 16px;
+  }
+
+  .thread-abstract {
+    font-size: 12px;
+  }
+
+  .board-entry-card {
+    padding: 12px;
+  }
+
+  .board-entry-head strong {
+    font-size: 15px;
+  }
+
+  .board-entry-card p {
+    font-size: 12px;
+    min-height: 40px;
+  }
+
+  .thread-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .thread-stats {
+    font-size: 11px;
+  }
+
+  .thread-tags {
+    margin-top: 4px;
+  }
+
+  .mini-tag {
+    font-size: 10px;
+    padding: 3px 6px;
+  }
+
+  .top-view-panel {
+    padding-bottom: 10px;
+  }
+
+  .top-slide {
+    border-radius: 10px;
+  }
+
+  .top-slide-mask {
+    padding: 12px 14px;
+  }
+
+  .top-slide-mask h3 {
+    font-size: 16px;
+  }
+
+  .top-slide-mask p {
+    font-size: 12px;
+  }
+
+  .announcement-panel {
+    padding: 14px;
+  }
+
+  .announcement-item {
+    padding: 12px 14px;
+  }
+
+  .announcement-title strong {
+    font-size: 14px;
+  }
+
+  .announcement-copy p {
+    font-size: 12px;
+  }
+
+  .panel {
+    padding: 14px;
+  }
+
+  .panel-header h3 {
+    font-size: 15px;
+  }
+
+  .quick-btn {
+    font-size: 12px;
+    padding: 9px 10px;
+  }
+
+  .rank-item {
+    padding: 8px;
+  }
+
+  .rank-copy strong {
+    font-size: 12px;
+  }
+
+  .rank-copy span {
+    font-size: 11px;
+  }
+
+  .level-item {
+    padding: 7px 9px;
+  }
+
+  .level-copy strong {
+    font-size: 12px;
+  }
+
+  .level-copy span {
+    font-size: 11px;
+  }
+
+  .tag-cloud {
+    gap: 6px;
+  }
+
+  .cloud-tag {
+    font-size: 11px;
+    padding: 4px 9px;
+  }
+
+  .profile-copy {
+    font-size: 12px;
+  }
+
+  .profile-contact {
+    font-size: 11px;
+  }
+
+  .profile-qrs {
+    gap: 6px;
+  }
+
+  .advert-item img {
+    height: 80px;
+  }
+
+  .advert-item span {
+    font-size: 12px;
+  }
+
+  .pagination {
+    margin-top: 12px;
+  }
+
+  .pagination :deep(.el-pagination__sizes) {
+    display: none;
+  }
+
+  .pagination :deep(.el-pagination__prev),
+  .pagination :deep(.el-pagination__next),
+  .pagination :deep(.el-pagination__item) {
+    min-width: 32px;
+    height: 32px;
+    font-size: 12px;
   }
 }
 </style>

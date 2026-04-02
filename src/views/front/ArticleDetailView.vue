@@ -142,6 +142,7 @@
 
         <!-- 右侧边栏 -->
         <div class="detail-sidebar">
+          <!-- 作者资料 - 不固定 -->
           <div class="sidebar-card author-card">
             <el-avatar
               :size="70"
@@ -163,68 +164,76 @@
               <el-button v-if="canPrivateMessage(article.user_id)" type="primary" size="small" @click="startPrivateMessage(article.user_id)">发私信</el-button>
             </div>
           </div>
-          <div class="sidebar-card toc-card">
-            <div class="toc-header">
-              <h3 class="toc-title">📑 文章目录</h3>
-              <el-button class="toc-toggle" type="primary" link @click="tocCollapsed = !tocCollapsed">
-                <el-icon><ArrowRight v-if="tocCollapsed" /><ArrowDown v-else /></el-icon>
-                <span>{{ tocCollapsed ? '展开' : '收起' }}</span>
-              </el-button>
+          
+          <!-- 固定部分：目录和操作栏 -->
+          <div class="sticky-sidebar">
+            <div class="sidebar-card toc-card">
+              <div class="toc-header">
+                <h3 class="toc-title">📑 文章目录</h3>
+                <el-button class="toc-toggle" type="primary" link @click="tocCollapsed = !tocCollapsed">
+                  <el-icon><ArrowRight v-if="tocCollapsed" /><ArrowDown v-else /></el-icon>
+                  <span>{{ tocCollapsed ? '展开' : '收起' }}</span>
+                </el-button>
+              </div>
+              <div v-show="!tocCollapsed" class="toc-content">
+                <div class="toc-list" v-if="tocData.length">
+                  <div
+                    v-for="(item, i) in tocData"
+                    :key="item.anchorId || `${item.title}-${i}`"
+                    class="toc-item"
+                    :class="`toc-level-${getTocItemLevel(item)}`"
+                    @click="scrollToSection(item)"
+                  >
+                    {{ item.title }}
+                  </div>
+                </div>
+                <div v-else class="toc-empty">暂无目录</div>
+              </div>
             </div>
-            <div v-show="!tocCollapsed" class="toc-content">
-              <div class="toc-list" v-if="tocData.length">
-                <div
-                  v-for="(item, i) in tocData"
-                  :key="item.anchorId || `${item.title}-${i}`"
-                  class="toc-item"
-                  :class="`toc-level-${getTocItemLevel(item)}`"
-                  @click="scrollToSection(item)"
-                >
-                  {{ item.title }}
+            
+            <!-- 操作栏 -->
+            <div class="sidebar-card action-card">
+              <h3 class="action-title">📌 操作</h3>
+              <div class="action-list">
+                <div class="action-item" :class="{'active': hasDigged}" @click="handleDigg">
+                  <el-icon :size="18"><StarFilled v-if="hasDigged" /><Star v-else /></el-icon>
+                  <span>点赞 ({{ article.digg_count || 0 }})</span>
+                </div>
+                <div class="action-item" :class="{'active': isCollected}" @click="handleCollect" v-if="userStore.isLoggedIn">
+                  <el-icon :size="18"><CollectionTag /></el-icon>
+                  <span>{{ isCollected ? '已收藏' : '收藏' }} ({{ article.collects_count || 0 }})</span>
+                </div>
+                <div class="action-item" @click="scrollToComment">
+                  <el-icon :size="18"><ChatDotRound /></el-icon>
+                  <span>评论 ({{ comments.length }})</span>
+                </div>
+                <div class="action-item" @click="scrollToTop">
+                  <el-icon :size="18"><Top /></el-icon>
+                  <span>回到顶部</span>
+                </div>
+                <div class="action-item" @click="scrollToBottom">
+                  <el-icon :size="18"><Bottom /></el-icon>
+                  <span>回到底部</span>
+                </div>
+                <div v-if="canReportArticle" class="action-item" @click="openReportDialog">
+                  <el-icon :size="18"><WarningFilled /></el-icon>
+                  <span>举报文章</span>
                 </div>
               </div>
-              <div v-else class="toc-empty">暂无目录</div>
-            </div>
-          </div>
-          
-          <!-- 操作栏 -->
-          <div class="sidebar-card action-card">
-            <h3 class="action-title">📌 操作</h3>
-            <div class="action-list">
-              <div class="action-item" :class="{'active': hasDigged}" @click="handleDigg">
-                <el-icon :size="18"><StarFilled v-if="hasDigged" /><Star v-else /></el-icon>
-                <span>点赞 ({{ article.digg_count || 0 }})</span>
+              <div v-if="canManageCurrentArticle" class="admin-action-box">
+                <el-divider />
+                <div class="admin-action-row">
+                  <span>文章私密</span>
+                  <el-switch
+                    :model-value="Boolean(article.is_private)"
+                    :loading="privateUpdating"
+                    @change="toggleArticlePrivate"
+                  />
+                </div>
+                <el-button type="danger" plain size="small" :loading="deleteLoading" @click="handleDeleteArticle">
+                  删除该文章
+                </el-button>
               </div>
-              <div class="action-item" :class="{'active': isCollected}" @click="handleCollect" v-if="userStore.isLoggedIn">
-                <el-icon :size="18"><CollectionTag /></el-icon>
-                <span>{{ isCollected ? '已收藏' : '收藏' }} ({{ article.collects_count || 0 }})</span>
-              </div>
-              <div class="action-item" @click="scrollToComment">
-                <el-icon :size="18"><ChatDotRound /></el-icon>
-                <span>评论 ({{ comments.length }})</span>
-              </div>
-              <div class="action-item" @click="scrollToTop">
-                <el-icon :size="18"><Top /></el-icon>
-                <span>回到顶部</span>
-              </div>
-              <div v-if="canReportArticle" class="action-item" @click="openReportDialog">
-                <el-icon :size="18"><WarningFilled /></el-icon>
-                <span>举报文章</span>
-              </div>
-            </div>
-            <div v-if="canManageCurrentArticle" class="admin-action-box">
-              <el-divider />
-              <div class="admin-action-row">
-                <span>文章私密</span>
-                <el-switch
-                  :model-value="Boolean(article.is_private)"
-                  :loading="privateUpdating"
-                  @change="toggleArticlePrivate"
-                />
-              </div>
-              <el-button type="danger" plain size="small" :loading="deleteLoading" @click="handleDeleteArticle">
-                删除该文章
-              </el-button>
             </div>
           </div>
         </div>
@@ -268,7 +277,7 @@ import { useUserStore } from '@/stores/user'
 import { apiGetArticleDetail, apiDiggArticle, apiCollectArticle, apiGetArticleTOC, apiUpdateArticle, apiDeleteArticle, apiCreateArticleReport } from '@/api/article'
 import { apiGetCommentList, apiCreateComment } from '@/api/comment'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Clock, View, Star, StarFilled, CollectionTag, ChatDotRound, Lock, Top, ArrowDown, ArrowRight, WarningFilled } from '@element-plus/icons-vue'
+import { Clock, View, Star, StarFilled, CollectionTag, ChatDotRound, Lock, Top, Bottom, ArrowDown, ArrowRight, WarningFilled } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import request from '@/utils/request'
@@ -1048,6 +1057,14 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function scrollToBottom() {
+  const h = Math.max(
+    document.body.scrollHeight,
+    document.documentElement.scrollHeight
+  )
+  window.scrollTo({ top: h, behavior: 'smooth' })
+}
+
 function resetReportForm() {
   reportForm.value = {
     reason: '',
@@ -1226,7 +1243,8 @@ watch(() => route.params.id, async (value, oldValue) => {
 
 .detail-layout { display: flex; gap: 24px; margin-top: -40px; position: relative; z-index: 10; }
 .detail-main { flex: 1; min-width: 0; }
-.detail-sidebar { width: 300px; flex-shrink: 0; position: sticky; top: 100px; align-self: flex-start; }
+.detail-sidebar { width: 300px; flex-shrink: 0; }
+.sticky-sidebar { position: sticky; top: 100px; align-self: flex-start; }
 
 .article-card { background: var(--bg-card); border-radius: 12px; padding: 36px 40px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); margin-bottom: 24px; }
 .article-title { font-size: 24px; font-weight: 700; color: var(--text-primary); margin: 0 0 12px; }
