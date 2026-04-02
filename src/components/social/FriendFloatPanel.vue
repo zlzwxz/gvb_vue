@@ -215,6 +215,7 @@ const socialStore = useSocialStore()
 const sectionPageSize = 6
 
 const hoverCapable = ref(false)
+const compactMode = ref(false)
 const expanded = ref(false)
 const saving = ref(false)
 const showPresenceEditor = ref(false)
@@ -283,6 +284,7 @@ const callDuration = computed(() => {
 
 function updateHoverCapability() {
   hoverCapable.value = Boolean(window.matchMedia?.('(hover: hover) and (pointer: fine)').matches)
+  compactMode.value = Boolean(window.matchMedia?.('(max-width: 768px)').matches)
 }
 
 function clearHoverTimer() {
@@ -310,6 +312,10 @@ function closeHover() {
 
 function toggleExpanded() {
   if (hoverCapable.value) return
+  if (compactMode.value) {
+    openMessageCenter()
+    return
+  }
   expanded.value = !expanded.value
 }
 
@@ -524,6 +530,7 @@ onBeforeUnmount(() => {
 .action-btn,.pager-btn{border:none;border-radius:10px;cursor:pointer}.action-btn{width:28px;height:28px;background:#eef4fb;color:#547392;display:grid;place-items:center}.action-btn:disabled{opacity:.42;cursor:not-allowed}.pager-row{padding:6px 4px 2px}.pager-btn{background:#ecf4fb;color:#28557e;padding:5px 10px;font-size:12px}.pager-btn:disabled{opacity:.45;cursor:not-allowed}
 .call-box{display:grid;justify-items:center;gap:12px;padding:12px 0}.call-duration{color:#0f766e;font-weight:700}
 .float-card-enter-active,.float-card-leave-active{transition:all .18s ease}.float-card-enter-from,.float-card-leave-to{opacity:0;transform:translateY(-6px) scale(.985)}
-@media (max-width:960px){.friend-float-wrap{right:12px;top:auto;bottom:84px}.friend-card{width:min(94vw,376px)}.friend-actions{opacity:1}}
+@media (max-width:960px){.friend-float-wrap{right:12px;top:auto;bottom:calc(84px + env(safe-area-inset-bottom))}.friend-card{width:min(94vw,376px)}.friend-actions{opacity:1}}
+@media (max-width:768px){.friend-float-wrap{width:auto;padding-bottom:0}.friend-launcher{width:56px;min-height:56px;border-radius:999px;padding:10px}.launcher-copy{display:none}.launcher-badge{width:34px;height:34px;border-radius:999px;font-size:18px}}
 @media (max-width:640px){.card-header,.presence-top,.friend-row,.pager-row{flex-direction:column;align-items:flex-start}.presence-editor-row{grid-template-columns:1fr}}
 </style>

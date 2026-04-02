@@ -21,7 +21,12 @@
           :name="tab.name"
           :label="tab.label"
         >
-          <el-form :model="forms[tab.name]" label-width="150px" v-loading="loading">
+          <el-form
+            :model="forms[tab.name]"
+            :label-width="formLabelWidth"
+            :label-position="formLabelPosition"
+            v-loading="loading"
+          >
             <div class="form-grid">
               <template v-for="field in tab.fields" :key="`${tab.name}-${field.key}`">
                 <el-form-item
@@ -121,6 +126,47 @@
                   </div>
                   <div class="form-tip">
                     开启“自动抓取”后，后端会按小时定时抓取；这里可手动触发一次并写入文章列表。
+                  </div>
+                </div>
+              </el-form-item>
+
+              <el-divider />
+              <el-form-item label="友情链接" class="full-line">
+                <div class="friend-links-config">
+                  <div class="friend-links-head">
+                    <div>
+                      <strong>友情链接</strong>
+                      <p class="friend-links-desc">前台页脚会展示这里启用的链接，支持图标与描述。</p>
+                    </div>
+                    <el-button type="primary" plain @click="addFriendLink">新增链接</el-button>
+                  </div>
+
+                  <div v-if="!friendLinks.length" class="form-tip">
+                    暂无友情链接，点击右上角“新增链接”添加。
+                  </div>
+
+                  <div v-else class="friend-links-list">
+                    <div
+                      v-for="(link, index) in friendLinks"
+                      :key="`friend-link-${index}`"
+                      class="friend-link-row"
+                    >
+                      <div class="friend-link-row-head">
+                        <el-switch v-model="link.is_show" active-text="展示" inactive-text="隐藏" />
+                        <div class="friend-link-actions">
+                          <el-button size="small" :disabled="index === 0" @click="moveFriendLink(index, -1)">上移</el-button>
+                          <el-button size="small" :disabled="index === friendLinks.length - 1" @click="moveFriendLink(index, 1)">下移</el-button>
+                          <el-button size="small" type="danger" plain @click="removeFriendLink(index)">删除</el-button>
+                        </div>
+                      </div>
+
+                      <div class="friend-link-grid">
+                        <el-input v-model="link.title" placeholder="名称，例如：OpenAI" />
+                        <el-input v-model="link.href" placeholder="跳转地址，例如：https://example.com" />
+                        <el-input v-model="link.icon" placeholder="图标(可选)，支持 uploads 或完整 URL" />
+                        <el-input v-model="link.desc" placeholder="描述(可选)" />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </el-form-item>
@@ -258,7 +304,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   apiExportESIndex,
@@ -286,12 +332,24 @@ const esIndexList = ref([])
 const selectedESIndex = ref('')
 const esImportResult = ref(null)
 const lastImportFileName = ref('')
+const isNarrowScreen = ref(false)
 
 const selectedESIndexMeta = computed(() => esIndexList.value.find(item => item.name === selectedESIndex.value) || null)
 const importFailurePreview = computed(() => {
   const list = Array.isArray(esImportResult.value?.failures) ? esImportResult.value.failures : []
   return list.slice(0, 20)
 })
+
+const formLabelPosition = computed(() => (isNarrowScreen.value ? 'top' : 'right'))
+const formLabelWidth = computed(() => (isNarrowScreen.value ? 'auto' : '150px'))
+
+function syncNarrowScreen() {
+  isNarrowScreen.value = window.matchMedia?.('(max-width: 900px)')?.matches ?? window.innerWidth <= 900
+}
+
+if (typeof window !== 'undefined') {
+  syncNarrowScreen()
+}
 
 const schemaMap = {
   system: {
@@ -350,9 +408,9 @@ const schemaMap = {
   qq: {
     label: 'QQ 登录',
     fields: [
-      { key: 'app_id', label: 'App ID', type: 'text' },
-      { key: 'key', label: 'App Key', type: 'password' },
-      { key: 'redirect', label: '回调地址', type: 'text', fullLine: true }
+      { key: 'app_id', label: 'App ID', type: 'text', placeholder: 'QQ互联 App ID，例如：101xxxxxx' },
+      { key: 'key', label: 'App Key', type: 'password', placeholder: 'QQ互联 App Key' },
+      { key: 'redirect', label: '回调地址', type: 'text', fullLine: true, placeholder: '例如：https://你的域名/login（需与 QQ互联后台配置一致）' }
     ]
   },
   qiniu: {
@@ -432,6 +490,11 @@ const tabList = Object.entries(schemaMap).map(([name, item]) => ({
   fields: item.fields
 }))
 
+const friendLinks = computed(() => {
+  const list = forms.site_info?.friend_links
+  return Array.isArray(list) ? list : []
+})
+
 function buildDefaultForm(fields) {
   const form = {}
   for (const field of fields) {
@@ -448,6 +511,48 @@ const forms = reactive(
   )
 )
 forms.news = { enabled_source_ids: [], enabled_source_names: [] }
+
+function normalizeFriendLinkItem(item) {
+  return {
+    title: String(item?.title || item?.name || '').trim(),
+    href: String(item?.href || item?.url || '').trim(),
+    icon: String(item?.icon || item?.logo || item?.images || '').trim(),
+    desc: String(item?.desc || item?.description || '').trim(),
+    is_show: item?.is_show !== false && item?.isShow !== false
+  }
+}
+
+function ensureFriendLinksArray() {
+  if (!forms.site_info) return
+  if (!Array.isArray(forms.site_info.friend_links)) {
+    forms.site_info.friend_links = []
+  }
+}
+
+function addFriendLink() {
+  ensureFriendLinksArray()
+  forms.site_info.friend_links.push({
+    title: '',
+    href: '',
+    icon: '',
+    desc: '',
+    is_show: true
+  })
+}
+
+function removeFriendLink(index) {
+  ensureFriendLinksArray()
+  forms.site_info.friend_links.splice(index, 1)
+}
+
+function moveFriendLink(index, offset) {
+  ensureFriendLinksArray()
+  const arr = forms.site_info.friend_links
+  const next = index + offset
+  if (next < 0 || next >= arr.length) return
+  const [item] = arr.splice(index, 1)
+  arr.splice(next, 0, item)
+}
 
 function normalizeEmailData(data) {
   const normalized = { ...data }
@@ -490,6 +595,11 @@ async function loadConfigByName(name = activeTab.value) {
     }
 
     Object.assign(forms[name], buildDefaultForm(schemaMap[name].fields), data)
+    if (name === 'site_info') {
+      ensureFriendLinksArray()
+      const list = Array.isArray(forms.site_info.friend_links) ? forms.site_info.friend_links : []
+      forms.site_info.friend_links = list.map(normalizeFriendLinkItem)
+    }
   } catch (e) {
     ElMessage.error(`加载 ${schemaMap[name]?.label || name} 配置失败`)
   } finally {
@@ -510,6 +620,12 @@ function buildPayload(name) {
   }
 
   const payload = { ...forms[name] }
+  if (name === 'site_info') {
+    const list = Array.isArray(payload.friend_links) ? payload.friend_links : []
+    payload.friend_links = list
+      .map(normalizeFriendLinkItem)
+      .filter((item) => item.title && item.href)
+  }
   if (name === 'email') {
     payload.user_tls = Boolean(payload.user_tls ?? payload.use_tls)
     delete payload.use_tls
@@ -678,7 +794,13 @@ watch(activeTab, (name) => {
 }, { immediate: true })
 
 onMounted(() => {
+  syncNarrowScreen()
+  window.addEventListener('resize', syncNarrowScreen, { passive: true })
   loadNewsSources()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncNarrowScreen)
 })
 </script>
 
@@ -817,6 +939,61 @@ onMounted(() => {
   color: #456b92;
 }
 
+.friend-links-config {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.friend-links-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.friend-links-desc {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #69839e;
+  line-height: 1.7;
+}
+
+.friend-links-list {
+  display: grid;
+  gap: 10px;
+}
+
+.friend-link-row {
+  border-radius: 12px;
+  border: 1px solid #dce8f4;
+  padding: 12px;
+  background: #f8fbff;
+  display: grid;
+  gap: 10px;
+}
+
+.friend-link-row-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.friend-link-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.friend-link-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
 @media (max-width: 900px) {
   .header-row {
     flex-direction: column;
@@ -830,6 +1007,10 @@ onMounted(() => {
   .es-action-bar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .friend-link-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

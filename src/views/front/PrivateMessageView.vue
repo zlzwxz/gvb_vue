@@ -8,7 +8,7 @@
     </section>
 
     <div class="social-shell">
-      <aside class="conversation-panel">
+      <aside class="conversation-panel" v-show="showConversationPanel">
         <div class="panel-head">
           <div>
             <p class="panel-kicker">Social Hub</p>
@@ -62,10 +62,13 @@
         </div>
       </aside>
 
-      <section class="chat-panel">
+      <section class="chat-panel" v-show="showChatPanel">
         <template v-if="selectedConversation">
           <div class="chat-head">
             <div class="chat-user">
+              <el-button v-if="isMobileLayout" class="chat-back" text @click="backToConversationList">
+                <el-icon><ArrowLeft /></el-icon>
+              </el-button>
               <el-avatar :src="selectedConversation.avatar ? $resolveImg(selectedConversation.avatar) : ''" :size="46">
                 {{ avatarText(selectedConversation.title) }}
               </el-avatar>
@@ -409,7 +412,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { FolderOpened, Lock, PhoneFilled, Plus, RefreshRight, Search, User } from '@element-plus/icons-vue'
@@ -447,6 +450,15 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const socialStore = useSocialStore()
+const isMobileLayout = ref(false)
+
+function syncMobileLayout() {
+  isMobileLayout.value = window.matchMedia?.('(max-width: 960px)')?.matches ?? window.innerWidth <= 960
+}
+
+function backToConversationList() {
+  router.replace({ name: 'PrivateMessages', query: {} }).catch(() => {})
+}
 
 const keyword = ref('')
 const draft = ref('')
@@ -531,8 +543,12 @@ const selectedConversation = computed(() => {
   if (groupId) return allConversations.value.find(item => Number(item.group_id) === groupId) || placeholderConversation.value
   const userId = Number(route.query.user_id) || 0
   if (userId) return allConversations.value.find(item => Number(item.user_id) === userId) || placeholderConversation.value
+  if (isMobileLayout.value) return null
   return placeholderConversation.value || allConversations.value[0] || null
 })
+
+const showConversationPanel = computed(() => !isMobileLayout.value || !selectedConversation.value)
+const showChatPanel = computed(() => !isMobileLayout.value || Boolean(selectedConversation.value))
 
 const isDirectConversation = computed(() => selectedConversation.value?.conversation_type === 'direct')
 const canFollowCurrent = computed(() => isDirectConversation.value && Number(selectedConversation.value?.user_id) > 0)
@@ -810,7 +826,9 @@ async function syncSelectionFromRoute() {
   placeholderConversation.value = null
   groupDetailDrawerVisible.value = false
   groupDetail.value = null
-  if (allConversations.value[0]) await selectConversation(allConversations.value[0])
+  relation.value = null
+  messages.value = []
+  if (!isMobileLayout.value && allConversations.value[0]) await selectConversation(allConversations.value[0])
 }
 function openDiscoveryDrawer() {
   searchDrawerVisible.value = true
@@ -1172,6 +1190,9 @@ function openDirectByUserId(userId) {
 watch(() => [route.query.user_id, route.query.group_id], async () => {
   await syncSelectionFromRoute()
 })
+watch(isMobileLayout, async () => {
+  await syncSelectionFromRoute()
+})
 watch(() => socialStore.messageVersion, async () => {
   await loadConversations()
   if (selectedConversation.value?.conversation_type === 'group') {
@@ -1189,7 +1210,13 @@ watch(() => socialStore.messageVersion, async () => {
   }
 })
 onMounted(async () => {
+  syncMobileLayout()
+  window.addEventListener('resize', syncMobileLayout, { passive: true })
   await refreshAll()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncMobileLayout)
 })
 </script>
 
@@ -1218,6 +1245,7 @@ onMounted(async () => {
 .chat-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .chat-head { padding: 22px 24px; border-bottom: 1px solid rgba(226,232,240,0.9); }
 .chat-user { display: flex; align-items: center; gap: 14px; }
+.chat-back { padding: 0; }
 .chat-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .message-list { flex: 1; min-height: 0; overflow: auto; padding: 24px; background: radial-gradient(circle at top right, rgba(14,165,233,0.08), transparent 32%), linear-gradient(180deg, #f8fbff 0%, #ffffff 100%); }
 .message-row { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 18px; }
@@ -1272,8 +1300,16 @@ onMounted(async () => {
 @media (max-width: 1100px) { .summary-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 960px) { .social-shell { grid-template-columns: 1fr; } }
 @media (max-width: 640px) {
-  .summary-row, .action-row { grid-template-columns: 1fr; }
+  .summary-row, .action-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .conversation-panel { padding: 16px; }
+  .chat-head { padding: 16px; }
+  .message-list { padding: 16px; }
+  .composer { padding: 14px; }
   .panel-head, .chat-head, .conversation-title, .conversation-desc, .composer-foot, .chat-tools, .drawer-item, .file-card, .group-hero { flex-direction: column; align-items: flex-start; }
   .message-box { max-width: 100%; }
+}
+
+@media (max-width: 420px) {
+  .summary-row, .action-row { grid-template-columns: 1fr; }
 }
 </style>

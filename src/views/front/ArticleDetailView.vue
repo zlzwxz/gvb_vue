@@ -1315,7 +1315,7 @@ watch(() => route.params.id, async (value, oldValue) => {
 .loading-state { padding: 60px 0; }
 
 @media (max-width: 768px) {
-  .hero-banner { height: 260px; }
+  .hero-banner { height: 260px; background-attachment: scroll; }
   .hero-title { font-size: 22px; }
   .detail-layout { flex-direction: column; }
   .detail-sidebar { width: 100%; position: static; top: auto; }

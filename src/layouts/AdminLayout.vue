@@ -1,6 +1,6 @@
 <template>
   <el-container class="admin-layout">
-    <el-aside :width="isCollapse ? '64px' : '220px'" class="admin-sidebar">
+    <el-aside v-if="!isMobile" :width="isCollapse ? '64px' : '220px'" class="admin-sidebar">
       <div class="brand" @click="goDashboard">
         <div class="brand-logo">{{ isCollapse ? 'G' : 'GVB' }}</div>
         <div v-if="!isCollapse" class="brand-copy">
@@ -57,11 +57,86 @@
       </el-scrollbar>
     </el-aside>
 
+    <el-drawer
+      v-if="isMobile"
+      v-model="mobileMenuVisible"
+      direction="ltr"
+      size="86%"
+      :with-header="false"
+      append-to-body
+      class="admin-mobile-drawer"
+    >
+      <div class="admin-mobile-shell">
+        <div class="brand mobile" @click="goDashboard">
+          <div class="brand-logo">GVB</div>
+          <div class="brand-copy">
+            <strong>运营后台</strong>
+            <span>Management Console</span>
+          </div>
+          <el-button class="mobile-close" circle @click.stop="mobileMenuVisible = false">
+            <el-icon><Close /></el-icon>
+          </el-button>
+        </div>
+
+        <el-scrollbar class="menu-scroll">
+          <el-menu
+            :default-active="$route.path"
+            router
+            :collapse="false"
+            :collapse-transition="false"
+            unique-opened
+            class="admin-menu"
+            @select="handleMobileMenuSelect"
+          >
+            <el-menu-item index="/admin/dashboard"><el-icon><DataLine /></el-icon><template #title>仪表盘</template></el-menu-item>
+            <el-menu-item index="/admin/articles"><el-icon><Document /></el-icon><template #title>文章管理</template></el-menu-item>
+            <el-menu-item index="/admin/article/edit"><el-icon><Edit /></el-icon><template #title>发布文章</template></el-menu-item>
+            <el-menu-item index="/admin/article/review"><el-icon><DocumentChecked /></el-icon><template #title>文章审核</template></el-menu-item>
+            <el-menu-item index="/admin/article/reports"><el-icon><WarningFilled /></el-icon><template #title>文章举报</template></el-menu-item>
+            <el-menu-item index="/admin/images"><el-icon><Picture /></el-icon><template #title>图片库</template></el-menu-item>
+            <el-menu-item index="/admin/messages"><el-icon><Message /></el-icon><template #title>私信管理</template></el-menu-item>
+            <el-menu-item index="/admin/collects"><el-icon><CollectionTag /></el-icon><template #title>收藏管理</template></el-menu-item>
+
+            <el-sub-menu index="system-group" v-if="userStore.isAdmin">
+              <template #title>
+                <el-icon><Tools /></el-icon>
+                <span>系统管理</span>
+              </template>
+              <el-menu-item index="/admin/users"><el-icon><User /></el-icon>用户管理</el-menu-item>
+              <el-menu-item index="/admin/tags"><el-icon><PriceTag /></el-icon>标签管理</el-menu-item>
+              <el-menu-item index="/admin/adverts"><el-icon><Promotion /></el-icon>广告管理</el-menu-item>
+              <el-menu-item index="/admin/menus"><el-icon><Menu /></el-icon>导航管理</el-menu-item>
+              <el-menu-item index="/admin/boards"><el-icon><Grid /></el-icon>板块管理</el-menu-item>
+              <el-menu-item index="/admin/socials"><el-icon><User /></el-icon>好友管理</el-menu-item>
+              <el-menu-item index="/admin/community"><el-icon><ChatDotRound /></el-icon>社区悬赏</el-menu-item>
+              <el-menu-item index="/admin/announcements"><el-icon><Bell /></el-icon>公告管理</el-menu-item>
+              <el-menu-item index="/admin/comments"><el-icon><ChatDotRound /></el-icon>评论管理</el-menu-item>
+              <el-menu-item index="/admin/chats"><el-icon><ChatLineSquare /></el-icon>群聊管理</el-menu-item>
+              <el-menu-item index="/admin/logs"><el-icon><Tickets /></el-icon>日志审计</el-menu-item>
+              <el-sub-menu index="material-group">
+                <template #title>
+                  <el-icon><Files /></el-icon>
+                  <span>素材中心</span>
+                </template>
+                <el-menu-item index="/admin/material/articles"><el-icon><DocumentAdd /></el-icon>文章素材</el-menu-item>
+                <el-menu-item index="/admin/material/images"><el-icon><PictureFilled /></el-icon>图片素材</el-menu-item>
+              </el-sub-menu>
+              <el-menu-item index="/admin/settings"><el-icon><Setting /></el-icon>系统配置</el-menu-item>
+            </el-sub-menu>
+          </el-menu>
+        </el-scrollbar>
+      </div>
+    </el-drawer>
+
     <el-container>
       <el-header class="admin-header">
         <div class="header-left">
-          <el-button class="icon-btn" circle @click="isCollapse = !isCollapse">
-            <el-icon><Fold v-if="!isCollapse" /><Expand v-else /></el-icon>
+          <el-button class="icon-btn" circle @click="toggleSidebar">
+            <el-icon>
+              <Menu v-if="isMobile" />
+              <Fold v-else-if="!isCollapse" />
+              <Expand v-else />
+            </el-icon>
           </el-button>
           <div class="header-titles">
             <h2>{{ pageTitle }}</h2>
@@ -121,12 +196,13 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import {
   Bell,
+  Close,
   ArrowDown,
   ArrowLeft,
   ChatDotRound,
@@ -159,6 +235,8 @@ const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
 const isCollapse = ref(false)
+const isMobile = ref(false)
+const mobileMenuVisible = ref(false)
 
 const pageTitle = computed(() => String(route.meta.title || '后台管理'))
 const adminBreadcrumbs = computed(() => buildAdminBreadcrumbs(route))
@@ -197,6 +275,36 @@ function handleCommand(command) {
   if (command === 'home') router.push('/')
   if (command === 'profile') router.push('/profile')
 }
+
+function toggleSidebar() {
+  if (isMobile.value) {
+    mobileMenuVisible.value = !mobileMenuVisible.value
+    return
+  }
+  isCollapse.value = !isCollapse.value
+}
+
+function handleMobileMenuSelect() {
+  mobileMenuVisible.value = false
+}
+
+function syncMobileLayout() {
+  isMobile.value = window.matchMedia?.('(max-width: 992px)')?.matches ?? window.innerWidth <= 992
+  if (!isMobile.value) mobileMenuVisible.value = false
+}
+
+onMounted(() => {
+  syncMobileLayout()
+  window.addEventListener('resize', syncMobileLayout, { passive: true })
+})
+
+watch(() => route.path, () => {
+  if (isMobile.value) mobileMenuVisible.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', syncMobileLayout)
+})
 </script>
 
 <style scoped>
@@ -343,7 +451,30 @@ function handleCommand(command) {
     #f4f8fc;
   padding: 16px;
   overflow-y: auto;
+  overflow-x: auto;
   min-width: 0;
+}
+
+.admin-mobile-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #12365a 0%, #0f2c4a 100%);
+}
+
+.brand.mobile {
+  justify-content: space-between;
+  padding-right: 10px;
+}
+
+.mobile-close {
+  border: 1px solid rgba(171, 202, 231, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #d8eeff;
+}
+
+:deep(.admin-mobile-drawer .el-drawer__body) {
+  padding: 0;
 }
 
 @media (max-width: 992px) {
@@ -353,6 +484,28 @@ function handleCommand(command) {
 
   .breadcrumb-row {
     align-items: flex-start;
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-header {
+    height: auto;
+    padding: 10px 12px;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .header-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .profile-trigger span {
+    display: none;
+  }
+
+  .admin-main {
+    padding: 12px;
   }
 }
 </style>

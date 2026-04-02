@@ -166,7 +166,7 @@
     </section>
 
     <el-row :gutter="20" class="forum-grid">
-      <el-col :xs="24" :lg="6" :xl="5">
+      <el-col :xs="24" :lg="6" :xl="5" class="home-col home-col-left">
         <section class="panel quick-panel">
           <div class="panel-header">
             <h3>社区操作</h3>
@@ -244,23 +244,33 @@
           </div>
         </section>
 
-        <section class="panel creator-panel" v-if="topLevelContributors.length">
+        <section class="panel friend-panel" v-if="friendLinksVisible.length || icpText">
           <div class="panel-header">
-            <h3>用户贡献榜</h3>
+            <h3>友情链接</h3>
+            <span v-if="friendLinksVisible.length">{{ friendLinksVisible.length }} 个链接</span>
           </div>
-          <div class="creator-list">
-            <article v-for="creator in topLevelContributors" :key="creator.id || creator.user_name" class="creator-item">
-              <el-avatar :size="34" :src="$resolveImg(creator.avatar)" />
-              <div class="creator-copy">
-                <strong>{{ creator.nick_name || creator.user_name || `用户${creator.id || ''}` }}</strong>
-                <span>Lv.{{ creator.level || 1 }} · 经验 {{ creator.experience || 0 }}</span>
-              </div>
-            </article>
+          <div v-if="friendLinksVisible.length" class="friend-chip-list">
+            <a
+              v-for="(link, index) in friendLinksVisible"
+              :key="`${link.title}-${index}`"
+              class="friend-chip"
+              :href="link.href"
+              target="_blank"
+              rel="noopener noreferrer"
+              :title="link.desc || link.title"
+            >
+              <img v-if="link.icon" class="friend-chip-icon" :src="$resolveImg(link.icon)" :alt="link.title" loading="lazy" />
+              <span class="friend-chip-text">{{ link.title }}</span>
+            </a>
+          </div>
+          <div v-if="icpText" class="icp-row">
+            备案号：
+            <a class="icp-link" href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">{{ icpText }}</a>
           </div>
         </section>
       </el-col>
 
-      <el-col :xs="24" :lg="12" :xl="14">
+      <el-col :xs="24" :lg="12" :xl="14" class="home-col home-col-main">
         <section class="panel thread-panel">
           <div class="panel-header">
             <h3>{{ feedTitle }}</h3>
@@ -328,7 +338,7 @@
         </section>
       </el-col>
 
-      <el-col :xs="24" :lg="6" :xl="5">
+      <el-col :xs="24" :lg="6" :xl="5" class="home-col home-col-right">
         <section class="panel rank-panel" v-if="hotRankingVisible.length" :style="{ order: homeLayout.orders.hot }">
           <div class="panel-header">
             <h3>今日热榜</h3>
@@ -603,12 +613,34 @@ const hotRanking = computed(() => (insights.value.hot_articles || []).slice(0, 8
 const hotRankingVisible = computed(() => hotRanking.value.slice(0, homeLayout.hotCount))
 const boardsVisible = computed(() => (boards.value || []).slice(0, 8))
 
-const topLevelContributors = computed(() => (levelRanking.value || []).slice(0, 3))
 const levelRankingVisible = computed(() => (levelRanking.value || []).slice(0, homeLayout.levelCount))
 const advertsVisible = computed(() => (adverts.value || []).slice(0, homeLayout.advertCount))
 const visibleTags = computed(() => {
   if (expandTags.value) return tags.value
   return (tags.value || []).slice(0, 16)
+})
+
+function isSafeFriendLinkHref(value) {
+  const href = String(value || '').trim()
+  if (!href) return false
+  if (/^(javascript:|data:|vbscript:)/i.test(href)) return false
+  return /^(https?:\/\/|\/\/|\/)/i.test(href)
+}
+
+const icpText = computed(() => String(siteInfo.value?.bei_an || '').trim())
+const friendLinksVisible = computed(() => {
+  const rawList = siteInfo.value?.friend_links || siteInfo.value?.friendLinks || []
+  const list = Array.isArray(rawList) ? rawList : []
+  return list
+    .map((item) => {
+      const title = String(item?.title || item?.name || '').trim()
+      const href = String(item?.href || item?.url || '').trim()
+      const icon = String(item?.icon || item?.logo || item?.images || '').trim()
+      const desc = String(item?.desc || item?.description || '').trim()
+      const isShow = item?.is_show !== false && item?.isShow !== false
+      return { title, href, icon, desc, isShow }
+    })
+    .filter((item) => item.isShow && item.title && item.href && isSafeFriendLinkHref(item.href))
 })
 
 function formatDateTime(value) {
@@ -1540,31 +1572,61 @@ onBeforeUnmount(() => {
   font-size: 12px;
 }
 
-.creator-list {
-  display: grid;
-  gap: 8px;
-}
-
-.creator-item {
-  border: 1px solid #e4ebf5;
-  border-radius: 10px;
-  padding: 8px 10px;
+.friend-chip-list {
   display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.friend-chip {
+  max-width: 220px;
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #dce7f2;
+  background: #ffffff;
+  color: #2d4a67;
 }
 
-.creator-copy strong {
-  display: block;
-  color: #14365a;
-  font-size: 13px;
+.friend-chip:hover {
+  border-color: #a9cae3;
+  background: #eaf6fc;
+  color: #0f7ea5;
 }
 
-.creator-copy span {
-  display: block;
-  margin-top: 3px;
-  font-size: 12px;
+.friend-chip-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(214, 224, 236, 0.9);
+  background: #f8fbff;
+}
+
+.friend-chip-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.icp-row {
+  margin-top: 10px;
   color: #6f839e;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.icp-link {
+  color: #0f7ea5;
+  text-decoration: none;
+}
+
+.icp-link:hover {
+  color: #0a6381;
 }
 
 .level-list {
@@ -1696,6 +1758,27 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 992px) {
+  .home-col-main {
+    order: 1;
+  }
+
+  .home-col-right {
+    order: 2;
+  }
+
+  .home-col-left {
+    order: 3;
+  }
+
+  .quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .quick-btn {
+    padding: 10px 10px;
+  }
+
   .board-entry-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1714,6 +1797,12 @@ onBeforeUnmount(() => {
 
   .topic-strip {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 420px) {
+  .quick-actions {
+    grid-template-columns: 1fr;
   }
 }
 

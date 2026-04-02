@@ -46,6 +46,8 @@ body {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-wrap: anywhere;
+  -webkit-tap-highlight-color: transparent;
 }
 
 img,
@@ -198,5 +200,48 @@ a:hover {
 .auth-form .el-input__wrapper,
 .auth-form .el-textarea__inner {
   border-radius: 10px;
+}
+
+/* ==========================================
+   Mobile Responsiveness
+   ========================================== */
+
+@media (max-width: 768px) {
+  :root {
+    --content-padding: 12px;
+  }
+
+  html {
+    font-size: 15px;
+  }
+
+  /* Element Plus Row uses negative margins for gutters which can cause subtle horizontal overflow on phones. */
+  .el-row {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  /* iOS Safari: prevent input focus auto-zoom (font-size must be >= 16px). */
+  .el-input__inner,
+  .el-textarea__inner,
+  .el-select__input {
+    font-size: 16px !important;
+  }
+
+  /* Clamp fixed-width dialogs/message boxes on small screens. */
+  .el-dialog,
+  .el-message-box {
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  /* Element Plus drawers often use fixed pixel widths; clamp them on phones. */
+  .el-drawer {
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  .el-notification,
+  .el-message {
+    max-width: calc(100vw - 24px) !important;
+  }
 }
 
